@@ -16,11 +16,28 @@ HOST="127.0.0.1"
 APP_PORT="8080"
 TTYD_PORT="7681"
 FONT_FAMILY="monospace"
+FONT_STYLE="monospace"
 FONT_SIZE="16"
+LINE_HEIGHT="1.2"
+TERMINAL_PADDING="0"
 COMMAND=("${SHELL:-bash}")
 
 usage() {
-  printf 'Usage: %s [--host HOST] [--app-port PORT] [--ttyd-port PORT] [--font-family FAMILY] [--font-size SIZE] [-- COMMAND...]\n' "$0"
+  printf 'Usage: %s [--host HOST] [--app-port PORT] [--ttyd-port PORT] [--font-style STYLE] [--font-family FAMILY] [--font-size SIZE] [--line-height HEIGHT] [--terminal-padding CSS_LENGTH] [-- COMMAND...]\n' "$0"
+}
+
+font_family_for_style() {
+  case "$1" in
+    monospace) printf 'monospace' ;;
+    sans) printf 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' ;;
+    serif) printf 'Georgia, "Times New Roman", serif' ;;
+    jetbrains) printf '"JetBrains Mono", monospace' ;;
+    fira) printf '"Fira Code", monospace' ;;
+    hack) printf 'Hack, monospace' ;;
+    source-code-pro) printf '"Source Code Pro", monospace' ;;
+    noto) printf '"Noto Sans Mono", monospace' ;;
+    *) return 1 ;;
+  esac
 }
 
 require_value() {
@@ -47,14 +64,35 @@ while [ "$#" -gt 0 ]; do
       TTYD_PORT="$2"
       shift 2
       ;;
-    --font-family|--font-style)
+    --font-family)
       require_value "$@"
       FONT_FAMILY="$2"
+      FONT_STYLE="custom"
+      shift 2
+      ;;
+    --font-style)
+      require_value "$@"
+      FONT_STYLE="$2"
+      if ! FONT_FAMILY="$(font_family_for_style "$FONT_STYLE")"; then
+        printf 'Unknown font style: %s\n' "$FONT_STYLE" >&2
+        printf 'Available styles: monospace, sans, serif, jetbrains, fira, hack, source-code-pro, noto\n' >&2
+        exit 2
+      fi
       shift 2
       ;;
     --font-size)
       require_value "$@"
       FONT_SIZE="$2"
+      shift 2
+      ;;
+    --line-height)
+      require_value "$@"
+      LINE_HEIGHT="$2"
+      shift 2
+      ;;
+    --terminal-padding|--padding)
+      require_value "$@"
+      TERMINAL_PADDING="$2"
       shift 2
       ;;
     --help|-h)
@@ -92,19 +130,41 @@ fi
 
 cleanup() {
   if [ -n "${TTYD_PID:-}" ]; then kill "$TTYD_PID" 2>/dev/null || true; fi
+  if [ -n "${PUBLIC_DIR:-}" ] && [ -d "$PUBLIC_DIR" ]; then rm -rf "$PUBLIC_DIR"; fi
 }
 trap cleanup EXIT INT TERM
 
+PUBLIC_DIR="$(mktemp -d "${TMPDIR:-/tmp}/termux-ttyd-pwa.XXXXXX")"
+cp -R "$APP_DIR/public/." "$PUBLIC_DIR/"
+python3 - "$PUBLIC_DIR/config.js" "$FONT_STYLE" "$FONT_FAMILY" "$TERMINAL_PADDING" <<'PY'
+import json
+import sys
+
+path, font_style, font_family, terminal_padding = sys.argv[1:]
+config = {
+    "fontStyle": font_style,
+    "fontFamily": font_family,
+    "terminalPadding": terminal_padding,
+}
+with open(path, "w", encoding="utf-8") as file:
+    file.write("window.TERMUX_TTYD_PWA_CONFIG = ")
+    json.dump(config, file, ensure_ascii=True)
+    file.write(";\n")
+PY
+
 ttyd \
+  --writable \
   --interface "$HOST" \
   --port "$TTYD_PORT" \
   --client-option "fontFamily=$FONT_FAMILY" \
   --client-option "fontSize=$FONT_SIZE" \
+  --client-option "lineHeight=$LINE_HEIGHT" \
   "${COMMAND[@]}" &
 TTYD_PID="$!"
 
 printf 'ttyd: http://%s:%s/\n' "$HOST" "$TTYD_PORT"
 printf 'PWA:  http://%s:%s/\n' "$HOST" "$APP_PORT"
-printf 'Font: family=%s size=%s\n' "$FONT_FAMILY" "$FONT_SIZE"
+printf 'Font: style=%s family=%s size=%s line-height=%s\n' "$FONT_STYLE" "$FONT_FAMILY" "$FONT_SIZE" "$LINE_HEIGHT"
+printf 'Terminal padding: %s\n' "$TERMINAL_PADDING"
 
-python3 -m http.server "$APP_PORT" --bind "$HOST" --directory "$APP_DIR/public"
+python3 -m http.server "$APP_PORT" --bind "$HOST" --directory "$PUBLIC_DIR"

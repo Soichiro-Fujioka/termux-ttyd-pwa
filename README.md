@@ -1,6 +1,6 @@
 # Termux ttyd PWA
 
-A lightweight PWA wrapper for `ttyd` on Android Termux. It keeps the terminal as the main surface while adding touch-friendly controls for keyboard focus, IME mode reminders, fullscreen, and font settings.
+A lightweight PWA wrapper for `ttyd` on Android Termux. It keeps the terminal as the main surface while adding swipe-open controls for settings and fullscreen.
 
 ## Requirements
 
@@ -31,13 +31,13 @@ Open `http://127.0.0.1:8080/` in Android Chrome or another PWA-capable browser.
 ## Startup Options
 
 ```sh
-./scripts/start.sh --font-family "JetBrains Mono" --font-size 18
+./scripts/start.sh --font-style jetbrains --font-size 18 --terminal-padding 12px
 ```
 
 Installed package usage is the same:
 
 ```sh
-termux-ttyd-pwa --font-family "JetBrains Mono" --font-size 18
+termux-ttyd-pwa --font-style jetbrains --font-size 18 --terminal-padding 12px
 ```
 
 Useful options:
@@ -45,10 +45,14 @@ Useful options:
 - `--host 127.0.0.1`
 - `--app-port 8080`
 - `--ttyd-port 7681`
-- `--font-family monospace`
 - `--font-style monospace`
+- `--font-family monospace`
 - `--font-size 16`
+- `--line-height 1.2`
+- `--terminal-padding 0`
 - `-- COMMAND...`
+
+Available font styles are `monospace`, `sans`, `serif`, `jetbrains`, `fira`, `hack`, `source-code-pro`, and `noto`. Use `--font-family` when you want to pass a custom CSS font family directly to `ttyd`.
 
 Example with a custom shell command:
 
@@ -56,7 +60,7 @@ Example with a custom shell command:
 ./scripts/start.sh --font-size 18 -- bash -l
 ```
 
-The startup font options are passed directly to `ttyd` with `--client-option`, so the terminal uses them before it is rendered.
+The startup font options are passed directly to `ttyd` with `--client-option`, so the terminal uses them before it is rendered. `--terminal-padding` adds CSS padding around the embedded terminal frame, which can help keep tmux status bars visible in fullscreen mode on mobile browsers.
 
 ## PWA Install
 
@@ -166,5 +170,5 @@ This repository is unsigned by default, so the source line uses `[trusted=yes]`.
 ## Notes
 
 - The embedded terminal defaults to `http://127.0.0.1:7681/`.
-- Runtime font settings are saved in local storage. Direct live styling may be blocked by browser origin rules when `ttyd` runs on another port, so startup font options are the reliable path.
+- Runtime font changes are shown as a selected startup style in the PWA settings because the embedded `ttyd` page runs on another port. Use startup font options to change the actual terminal font.
 - The IME button is intentionally simple. It keeps focus behavior predictable and avoids interfering with Japanese composition events.
