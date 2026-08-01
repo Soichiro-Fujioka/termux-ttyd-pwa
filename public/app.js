@@ -79,9 +79,21 @@
     }
   }
 
+  function isFullscreen() {
+    return Boolean(document.fullscreenElement) || window.matchMedia("(display-mode: fullscreen)").matches;
+  }
+
+  function updateFullscreenState() {
+    var active = isFullscreen();
+    fullscreenToggle.classList.toggle("is-active", active);
+    fullscreenToggle.setAttribute("aria-pressed", active ? "true" : "false");
+    fullscreenToggle.textContent = active ? "Fullscreen: On" : "Fullscreen";
+  }
+
   var settings = readSettings();
   applyForm(settings);
   loadTerminal(settings);
+  updateFullscreenState();
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
@@ -101,12 +113,22 @@
 
   fullscreenToggle.addEventListener("click", function () {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(function () {});
+      document.documentElement.requestFullscreen().catch(function () {
+        updateFullscreenState();
+      });
     } else {
-      document.exitFullscreen().catch(function () {});
+      document.exitFullscreen().catch(function () {
+        updateFullscreenState();
+      });
     }
     closeDrawer();
   });
+
+  document.addEventListener("fullscreenchange", updateFullscreenState);
+
+  try {
+    window.matchMedia("(display-mode: fullscreen)").addEventListener("change", updateFullscreenState);
+  } catch (error) {}
 
   drawerBackdrop.addEventListener("click", closeDrawer);
 

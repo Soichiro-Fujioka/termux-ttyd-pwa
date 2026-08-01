@@ -4,7 +4,7 @@
   "description": "Mobile-friendly PWA wrapper for ttyd on Termux.",
   "start_url": "/",
   "scope": "/",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "any",
   "background_color": "#030712",
   "theme_color": "#111827",

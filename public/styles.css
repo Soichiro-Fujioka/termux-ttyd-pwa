@@ -130,6 +130,13 @@ body {
   touch-action: manipulation;
 }
 
+.drawer-action.is-active {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
 .settings-panel {
   margin-top: 0.85rem;
   padding-top: 0.85rem;
