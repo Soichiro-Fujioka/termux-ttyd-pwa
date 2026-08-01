@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PREFIX_DIR="${PREFIX:-/data/data/com.termux/files/usr}"
+
+if [ -n "${TERMUX_TTYD_PWA_DIR:-}" ]; then
+  APP_DIR="$TERMUX_TTYD_PWA_DIR"
+elif [ -d "$PREFIX_DIR/share/termux-ttyd-pwa/public" ]; then
+  APP_DIR="$PREFIX_DIR/share/termux-ttyd-pwa"
+else
+  APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
+
+HOST="127.0.0.1"
+APP_PORT="8080"
+TTYD_PORT="7681"
+FONT_FAMILY="monospace"
+FONT_SIZE="16"
+COMMAND=("${SHELL:-bash}")
+
+usage() {
+  printf 'Usage: %s [--host HOST] [--app-port PORT] [--ttyd-port PORT] [--font-family FAMILY] [--font-size SIZE] [-- COMMAND...]\n' "$0"
+}
+
+require_value() {
+  if [ "$#" -lt 2 ]; then
+    printf '%s requires a value.\n' "$1" >&2
+    exit 2
+  fi
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --host)
+      require_value "$@"
+      HOST="$2"
+      shift 2
+      ;;
+    --app-port)
+      require_value "$@"
+      APP_PORT="$2"
+      shift 2
+      ;;
+    --ttyd-port)
+      require_value "$@"
+      TTYD_PORT="$2"
+      shift 2
+      ;;
+    --font-family|--font-style)
+      require_value "$@"
+      FONT_FAMILY="$2"
+      shift 2
+      ;;
+    --font-size)
+      require_value "$@"
+      FONT_SIZE="$2"
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      if [ "$#" -gt 0 ]; then
+        COMMAND=("$@")
+      fi
+      break
+      ;;
+    *)
+      COMMAND=("$@")
+      break
+      ;;
+  esac
+done
+
+if [ ! -d "$APP_DIR/public" ]; then
+  printf 'PWA files were not found at %s/public.\n' "$APP_DIR" >&2
+  exit 1
+fi
+
+if ! command -v ttyd >/dev/null 2>&1; then
+  printf 'ttyd is not installed or is not on PATH.\n' >&2
+  exit 1
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  printf 'python3 is required to serve the PWA files.\n' >&2
+  exit 1
+fi
+
+cleanup() {
+  if [ -n "${TTYD_PID:-}" ]; then kill "$TTYD_PID" 2>/dev/null || true; fi
+}
+trap cleanup EXIT INT TERM
+
+ttyd \
+  --interface "$HOST" \
+  --port "$TTYD_PORT" \
+  --client-option "fontFamily=$FONT_FAMILY" \
+  --client-option "fontSize=$FONT_SIZE" \
+  "${COMMAND[@]}" &
+TTYD_PID="$!"
+
+printf 'ttyd: http://%s:%s/\n' "$HOST" "$TTYD_PORT"
+printf 'PWA:  http://%s:%s/\n' "$HOST" "$APP_PORT"
+printf 'Font: family=%s size=%s\n' "$FONT_FAMILY" "$FONT_SIZE"
+
+python3 -m http.server "$APP_PORT" --bind "$HOST" --directory "$APP_DIR/public"
