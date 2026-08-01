@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#111827">
+    <title>Termux ttyd PWA</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="app-bar">
+      <button id="focusTerminal" class="button primary" type="button">Keyboard</button>
+      <button id="imeToggle" class="button" type="button" aria-pressed="false">IME: EN</button>
+      <button id="settingsToggle" class="button" type="button" aria-expanded="false" aria-controls="settingsPanel">Settings</button>
+      <button id="fullscreenToggle" class="button" type="button">Fullscreen</button>
+    </header>
+
+    <main class="terminal-shell">
+      <iframe id="terminalFrame" class="terminal-frame" title="ttyd terminal" allow="fullscreen; clipboard-read; clipboard-write"></iframe>
+    </main>
+
+    <section id="settingsPanel" class="settings-panel" hidden>
+      <form id="settingsForm" class="settings-form">
+        <label>
+          ttyd URL
+          <input id="ttydUrl" name="ttydUrl" type="url" inputmode="url" autocomplete="off">
+        </label>
+        <label>
+          Font family
+          <input id="fontFamily" name="fontFamily" type="text" autocomplete="off" placeholder="monospace">
+        </label>
+        <label>
+          Font size
+          <input id="fontSize" name="fontSize" type="number" min="8" max="48" step="1">
+        </label>
+        <div class="settings-actions">
+          <button class="button primary" type="submit">Apply</button>
+          <button id="reloadTerminal" class="button" type="button">Reload</button>
+        </div>
+      </form>
+      <p class="hint">Font changes are sent to the embedded ttyd page when browser security allows it. Otherwise, start ttyd with the matching font options.</p>
+    </section>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>

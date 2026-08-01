@@ -1,0 +1,19 @@
+{
+  "name": "Termux ttyd PWA",
+  "short_name": "ttyd PWA",
+  "description": "Mobile-friendly PWA wrapper for ttyd on Termux.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#030712",
+  "theme_color": "#111827",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
