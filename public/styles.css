@@ -1,6 +1,5 @@
 :root {
   color-scheme: dark;
-  --bar-height: 3.25rem;
   --bg: #030712;
   --panel: #111827;
   --panel-soft: #1f2937;
@@ -9,6 +8,7 @@
   --accent: #38bdf8;
   --accent-text: #082f49;
   --border: rgba(255, 255, 255, 0.12);
+  --terminal-padding: 0;
 }
 
 * {
@@ -31,16 +31,6 @@ body {
   padding-right: env(safe-area-inset-right);
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
-}
-
-.app-bar {
-  display: flex;
-  gap: 0.45rem;
-  align-items: center;
-  min-height: var(--bar-height);
-  padding: 0.45rem;
-  background: linear-gradient(180deg, rgba(17, 24, 39, 0.98), rgba(17, 24, 39, 0.88));
-  border-bottom: 1px solid var(--border);
 }
 
 .button {
@@ -66,7 +56,8 @@ body {
 }
 
 .terminal-shell {
-  height: calc(100dvh - var(--bar-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  padding: var(--terminal-padding);
   background: #000;
 }
 
@@ -78,18 +69,71 @@ body {
   background: #000;
 }
 
-.settings-panel {
+.edge-swipe-zone {
   position: fixed;
-  right: max(0.5rem, env(safe-area-inset-right));
-  bottom: max(0.5rem, env(safe-area-inset-bottom));
-  left: max(0.5rem, env(safe-area-inset-left));
+  top: env(safe-area-inset-top);
+  right: 0;
+  bottom: env(safe-area-inset-bottom);
+  z-index: 9;
+  width: 28px;
+  background: transparent;
+  touch-action: pan-y;
+}
+
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
   z-index: 10;
-  max-width: 42rem;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.control-drawer {
+  position: fixed;
+  top: env(safe-area-inset-top);
+  right: 0;
+  bottom: env(safe-area-inset-bottom);
+  z-index: 11;
+  width: min(21rem, calc(100vw - 2rem));
   padding: 0.85rem;
-  border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-left: 1px solid var(--border);
   background: rgba(17, 24, 39, 0.96);
-  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.45);
+  box-shadow: -1rem 0 3rem rgba(0, 0, 0, 0.45);
+  transform: translateX(100%);
+  transition: transform 160ms ease-out;
+  touch-action: pan-y;
+}
+
+.control-drawer.is-open {
+  transform: translateX(0);
+}
+
+.drawer-grip {
+  width: 2.5rem;
+  height: 0.25rem;
+  margin: 0 auto 0.85rem;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.drawer-action {
+  display: block;
+  width: 100%;
+  min-height: 3rem;
+  margin-bottom: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  background: var(--panel-soft);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  padding: 0 0.85rem;
+  touch-action: manipulation;
+}
+
+.settings-panel {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
 }
 
 .settings-form {
@@ -104,7 +148,8 @@ label {
   font-size: 0.9rem;
 }
 
-input {
+input,
+select {
   min-height: 2.35rem;
   width: 100%;
   border: 1px solid var(--border);
@@ -115,27 +160,25 @@ input {
   font: inherit;
 }
 
+.settings-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.settings-note code {
+  color: var(--text);
+}
+
 .settings-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
 }
 
-.hint {
-  margin: 0.75rem 0 0;
-  color: var(--muted);
-  font-size: 0.85rem;
-  line-height: 1.4;
-}
-
-@media (max-width: 460px) {
-  .app-bar {
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .button {
-    flex: 0 0 auto;
-    padding: 0 0.65rem;
+@media (prefers-reduced-motion: reduce) {
+  .control-drawer {
+    transition: none;
   }
 }

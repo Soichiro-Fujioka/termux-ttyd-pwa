@@ -10,39 +10,51 @@
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
-    <header class="app-bar">
-      <button id="focusTerminal" class="button primary" type="button">Keyboard</button>
-      <button id="imeToggle" class="button" type="button" aria-pressed="false">IME: EN</button>
-      <button id="settingsToggle" class="button" type="button" aria-expanded="false" aria-controls="settingsPanel">Settings</button>
-      <button id="fullscreenToggle" class="button" type="button">Fullscreen</button>
-    </header>
-
     <main class="terminal-shell">
       <iframe id="terminalFrame" class="terminal-frame" title="ttyd terminal" allow="fullscreen; clipboard-read; clipboard-write"></iframe>
     </main>
 
-    <section id="settingsPanel" class="settings-panel" hidden>
-      <form id="settingsForm" class="settings-form">
-        <label>
-          ttyd URL
-          <input id="ttydUrl" name="ttydUrl" type="url" inputmode="url" autocomplete="off">
-        </label>
-        <label>
-          Font family
-          <input id="fontFamily" name="fontFamily" type="text" autocomplete="off" placeholder="monospace">
-        </label>
-        <label>
-          Font size
-          <input id="fontSize" name="fontSize" type="number" min="8" max="48" step="1">
-        </label>
-        <div class="settings-actions">
-          <button class="button primary" type="submit">Apply</button>
-          <button id="reloadTerminal" class="button" type="button">Reload</button>
-        </div>
-      </form>
-      <p class="hint">Font changes are sent to the embedded ttyd page when browser security allows it. Otherwise, start ttyd with the matching font options.</p>
-    </section>
+    <div id="edgeSwipeZone" class="edge-swipe-zone" aria-hidden="true"></div>
+    <div id="drawerBackdrop" class="drawer-backdrop" hidden></div>
+    <aside id="controlDrawer" class="control-drawer" aria-label="Controls" aria-hidden="true">
+      <div class="drawer-grip" aria-hidden="true"></div>
+      <button id="settingsToggle" class="drawer-action" type="button" aria-expanded="false" aria-controls="settingsPanel">Settings</button>
+      <button id="fullscreenToggle" class="drawer-action" type="button">Fullscreen</button>
 
+      <section id="settingsPanel" class="settings-panel" hidden>
+        <form id="settingsForm" class="settings-form">
+          <label>
+            ttyd URL
+            <input id="ttydUrl" name="ttydUrl" type="url" inputmode="url" autocomplete="off">
+          </label>
+          <label>
+            Terminal padding
+            <input id="terminalPadding" name="terminalPadding" type="text" inputmode="text" autocomplete="off" placeholder="0 or 12px">
+          </label>
+          <label>
+            Font style
+            <select id="fontStyle" name="fontStyle">
+              <option value="monospace">Monospace</option>
+              <option value="sans">Sans</option>
+              <option value="serif">Serif</option>
+              <option value="jetbrains">JetBrains Mono</option>
+              <option value="fira">Fira Code</option>
+              <option value="hack">Hack</option>
+              <option value="source-code-pro">Source Code Pro</option>
+              <option value="noto">Noto Sans Mono</option>
+              <option value="custom">Custom startup font</option>
+            </select>
+          </label>
+          <p class="settings-note">Font style is applied by the startup command. Change it with <code>--font-style</code>, then reload the app.</p>
+          <div class="settings-actions">
+            <button class="button primary" type="submit">Apply</button>
+            <button id="reloadTerminal" class="button" type="button">Reload</button>
+          </div>
+        </form>
+      </section>
+    </aside>
+
+    <script src="/config.js"></script>
     <script src="/app.js" defer></script>
   </body>
 </html>

@@ -1,29 +1,30 @@
 (function () {
   var defaults = {
     ttydUrl: window.location.protocol + "//" + window.location.hostname + ":7681/",
-    fontFamily: "monospace",
-    fontSize: "16",
-    imeMode: "EN"
+    terminalPadding: "0",
+    fontStyle: "monospace"
   };
+  var startupConfig = window.TERMUX_TTYD_PWA_CONFIG || {};
 
   var storageKey = "termux-ttyd-pwa.settings";
   var frame = document.getElementById("terminalFrame");
+  var edgeSwipeZone = document.getElementById("edgeSwipeZone");
+  var drawer = document.getElementById("controlDrawer");
+  var drawerBackdrop = document.getElementById("drawerBackdrop");
   var settingsPanel = document.getElementById("settingsPanel");
   var settingsToggle = document.getElementById("settingsToggle");
   var fullscreenToggle = document.getElementById("fullscreenToggle");
-  var focusTerminal = document.getElementById("focusTerminal");
-  var imeToggle = document.getElementById("imeToggle");
   var reloadTerminal = document.getElementById("reloadTerminal");
   var form = document.getElementById("settingsForm");
   var ttydUrlInput = document.getElementById("ttydUrl");
-  var fontFamilyInput = document.getElementById("fontFamily");
-  var fontSizeInput = document.getElementById("fontSize");
+  var terminalPaddingInput = document.getElementById("terminalPadding");
+  var fontStyleInput = document.getElementById("fontStyle");
 
   function readSettings() {
     try {
-      return Object.assign({}, defaults, JSON.parse(localStorage.getItem(storageKey) || "{}"));
+      return Object.assign({}, defaults, JSON.parse(localStorage.getItem(storageKey) || "{}"), startupConfig);
     } catch (error) {
-      return Object.assign({}, defaults);
+      return Object.assign({}, defaults, startupConfig);
     }
   }
 
@@ -33,10 +34,27 @@
 
   function applyForm(settings) {
     ttydUrlInput.value = settings.ttydUrl;
-    fontFamilyInput.value = settings.fontFamily;
-    fontSizeInput.value = settings.fontSize;
-    imeToggle.textContent = "IME: " + settings.imeMode;
-    imeToggle.setAttribute("aria-pressed", settings.imeMode === "JA" ? "true" : "false");
+    terminalPaddingInput.value = settings.terminalPadding;
+    fontStyleInput.value = settings.fontStyle;
+  }
+
+  function applyLayout(settings) {
+    document.documentElement.style.setProperty("--terminal-padding", settings.terminalPadding || "0");
+  }
+
+  function openDrawer() {
+    drawer.classList.add("is-open");
+    drawer.setAttribute("aria-hidden", "false");
+    drawerBackdrop.hidden = false;
+  }
+
+  function closeDrawer() {
+    drawer.classList.remove("is-open");
+    drawer.setAttribute("aria-hidden", "true");
+    drawerBackdrop.hidden = true;
+    settingsPanel.hidden = true;
+    settingsToggle.setAttribute("aria-expanded", "false");
+    focusFrame();
   }
 
   function normalizeUrl(value) {
@@ -48,6 +66,7 @@
   }
 
   function loadTerminal(settings) {
+    applyLayout(settings);
     frame.src = normalizeUrl(settings.ttydUrl);
   }
 
@@ -57,28 +76,6 @@
       frame.contentWindow.focus();
     } catch (error) {
       // Cross-origin ttyd frames can still be focused through the iframe element.
-    }
-  }
-
-  function applyFont(settings) {
-    document.documentElement.style.setProperty("--terminal-font-family", settings.fontFamily);
-    document.documentElement.style.setProperty("--terminal-font-size", settings.fontSize + "px");
-
-    try {
-      var doc = frame.contentDocument;
-      if (!doc) return;
-      var style = doc.getElementById("termux-ttyd-pwa-font");
-      if (!style) {
-        style = doc.createElement("style");
-        style.id = "termux-ttyd-pwa-font";
-        doc.head.appendChild(style);
-      }
-      style.textContent = ".xterm, .xterm-rows, .terminal { font-family: " + JSON.stringify(settings.fontFamily) + " !important; font-size: " + Number(settings.fontSize) + "px !important; }";
-      window.setTimeout(function () {
-        frame.contentWindow.dispatchEvent(new Event("resize"));
-      }, 60);
-    } catch (error) {
-      // Browser isolation may block direct styling when ttyd runs on another port.
     }
   }
 
@@ -93,24 +90,13 @@
   }
 
   frame.addEventListener("load", function () {
-    applyFont(settings);
     focusFrame();
   });
-
-  focusTerminal.addEventListener("click", focusFrame);
 
   settingsToggle.addEventListener("click", function () {
     var nextHidden = !settingsPanel.hidden;
     settingsPanel.hidden = nextHidden;
     settingsToggle.setAttribute("aria-expanded", nextHidden ? "false" : "true");
-    if (nextHidden) focusFrame();
-  });
-
-  imeToggle.addEventListener("click", function () {
-    settings.imeMode = settings.imeMode === "EN" ? "JA" : "EN";
-    writeSettings(settings);
-    applyForm(settings);
-    focusFrame();
   });
 
   fullscreenToggle.addEventListener("click", function () {
@@ -119,7 +105,10 @@
     } else {
       document.exitFullscreen().catch(function () {});
     }
+    closeDrawer();
   });
+
+  drawerBackdrop.addEventListener("click", closeDrawer);
 
   reloadTerminal.addEventListener("click", function () {
     loadTerminal(settings);
@@ -130,17 +119,51 @@
     event.preventDefault();
     settings = {
       ttydUrl: normalizeUrl(ttydUrlInput.value),
-      fontFamily: fontFamilyInput.value.trim() || defaults.fontFamily,
-      fontSize: String(Math.min(48, Math.max(8, Number(fontSizeInput.value) || Number(defaults.fontSize)))),
-      imeMode: settings.imeMode
+      terminalPadding: terminalPaddingInput.value.trim() || "0",
+      fontStyle: fontStyleInput.value
     };
     writeSettings(settings);
     applyForm(settings);
-    applyFont(settings);
+    applyLayout(settings);
     loadTerminal(settings);
-    settingsPanel.hidden = true;
-    settingsToggle.setAttribute("aria-expanded", "false");
-    focusFrame();
+    closeDrawer();
+  });
+
+  var swipeStartX = 0;
+  var swipeStartY = 0;
+  var swipeTracking = false;
+
+  function onSwipeStart(event) {
+    if (event.touches.length !== 1) return;
+    swipeStartX = event.touches[0].clientX;
+    swipeStartY = event.touches[0].clientY;
+    swipeTracking = true;
+  }
+
+  function onSwipeEnd(event) {
+    if (!swipeTracking || event.changedTouches.length !== 1) return;
+    var touch = event.changedTouches[0];
+    var deltaX = touch.clientX - swipeStartX;
+    var deltaY = Math.abs(touch.clientY - swipeStartY);
+    swipeTracking = false;
+
+    if (deltaY > 80) return;
+    if (swipeStartX > window.innerWidth - 28 && deltaX < -45) {
+      openDrawer();
+    } else if (drawer.classList.contains("is-open") && deltaX > 45) {
+      closeDrawer();
+    }
+  }
+
+  edgeSwipeZone.addEventListener("touchstart", onSwipeStart, { passive: true });
+  edgeSwipeZone.addEventListener("touchend", onSwipeEnd, { passive: true });
+  drawer.addEventListener("touchstart", onSwipeStart, { passive: true });
+  drawer.addEventListener("touchend", onSwipeEnd, { passive: true });
+
+  window.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && drawer.classList.contains("is-open")) {
+      closeDrawer();
+    }
   });
 
   window.addEventListener("resize", function () {
