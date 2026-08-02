@@ -47,7 +47,7 @@ Useful options:
 - `--ttyd-port 7681`
 - `--font-style monospace`
 - `--font-family monospace`
-- `--font-size 16`
+- `--font-size 14`
 - `--line-height 1.2`
 - `--terminal-padding 0`
 - `-- COMMAND...`
