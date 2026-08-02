@@ -20,6 +20,7 @@ FONT_STYLE="monospace"
 FONT_SIZE="14"
 LINE_HEIGHT="1.2"
 TERMINAL_PADDING="0"
+TERMINAL_THEME='{"foreground":"#ffffff","background":"#000000","cursor":"#ffffff","cursorAccent":"#000000","selectionBackground":"#4d4d4d","black":"#000000","red":"#cc0000","green":"#00cc00","yellow":"#cccc00","blue":"#0000cc","magenta":"#cc00cc","cyan":"#00cccc","white":"#cccccc","brightBlack":"#666666","brightRed":"#ff0000","brightGreen":"#00ff00","brightYellow":"#ffff00","brightBlue":"#0000ff","brightMagenta":"#ff00ff","brightCyan":"#00ffff","brightWhite":"#ffffff"}'
 COMMAND=("${SHELL:-bash}")
 
 usage() {
@@ -45,6 +46,53 @@ require_value() {
     printf '%s requires a value.\n' "$1" >&2
     exit 2
   fi
+}
+
+termux_theme() {
+  python3 - "$TERMINAL_THEME" "${TERMUX_COLORS_FILE:-}" "${HOME:-}/.termux/colors.properties" "/data/data/com.termux/files/home/.termux/colors.properties" <<'PY'
+import json
+import os
+import sys
+
+theme = json.loads(sys.argv[1])
+paths = [os.path.expanduser(path) for path in sys.argv[2:] if path]
+path = next((candidate for candidate in paths if os.path.isfile(candidate)), None)
+
+mapping = {
+    "background": "background",
+    "foreground": "foreground",
+    "cursor": "cursor",
+    "color0": "black",
+    "color1": "red",
+    "color2": "green",
+    "color3": "yellow",
+    "color4": "blue",
+    "color5": "magenta",
+    "color6": "cyan",
+    "color7": "white",
+    "color8": "brightBlack",
+    "color9": "brightRed",
+    "color10": "brightGreen",
+    "color11": "brightYellow",
+    "color12": "brightBlue",
+    "color13": "brightMagenta",
+    "color14": "brightCyan",
+    "color15": "brightWhite",
+}
+
+if path:
+    with open(path, encoding="utf-8") as file:
+        for line in file:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = [part.strip() for part in line.split("=", 1)]
+            if key in mapping and value:
+                theme[mapping[key]] = value
+    theme["cursorAccent"] = theme.get("background", "#000000")
+
+print(json.dumps(theme, ensure_ascii=True, separators=(",", ":")))
+PY
 }
 
 while [ "$#" -gt 0 ]; do
@@ -128,6 +176,8 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
+TERMINAL_THEME="$(termux_theme)"
+
 cleanup() {
   if [ -n "${TTYD_PID:-}" ]; then kill "$TTYD_PID" 2>/dev/null || true; fi
   if [ -n "${PUBLIC_DIR:-}" ] && [ -d "$PUBLIC_DIR" ]; then rm -rf "$PUBLIC_DIR"; fi
@@ -159,6 +209,7 @@ ttyd \
   --client-option "fontFamily=$FONT_FAMILY" \
   --client-option "fontSize=$FONT_SIZE" \
   --client-option "lineHeight=$LINE_HEIGHT" \
+  --client-option "theme=$TERMINAL_THEME" \
   "${COMMAND[@]}" &
 TTYD_PID="$!"
 
