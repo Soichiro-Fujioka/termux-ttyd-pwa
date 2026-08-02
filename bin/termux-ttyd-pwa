@@ -15,28 +15,22 @@ fi
 HOST="127.0.0.1"
 APP_PORT="8080"
 TTYD_PORT="7681"
-FONT_FAMILY="monospace"
-FONT_STYLE="monospace"
+FONT_FAMILY='"TermuxTtydPwaFont", monospace'
+FONT_STYLE="termux"
 FONT_SIZE="14"
+FONT_WEIGHT="normal"
 LINE_HEIGHT="1.2"
 TERMINAL_PADDING="0"
 TERMINAL_THEME='{"foreground":"#ffffff","background":"#000000","cursor":"#ffffff","cursorAccent":"#000000","selectionBackground":"#4d4d4d","black":"#000000","red":"#cc0000","green":"#00cc00","yellow":"#cccc00","blue":"#0000cc","magenta":"#cc00cc","cyan":"#00cccc","white":"#cccccc","brightBlack":"#666666","brightRed":"#ff0000","brightGreen":"#00ff00","brightYellow":"#ffff00","brightBlue":"#0000ff","brightMagenta":"#ff00ff","brightCyan":"#00ffff","brightWhite":"#ffffff"}'
 COMMAND=("${SHELL:-bash}")
 
 usage() {
-  printf 'Usage: %s [--host HOST] [--app-port PORT] [--ttyd-port PORT] [--font-style STYLE] [--font-family FAMILY] [--font-size SIZE] [--line-height HEIGHT] [--terminal-padding CSS_LENGTH] [-- COMMAND...]\n' "$0"
+  printf 'Usage: %s [--host HOST] [--app-port PORT] [--ttyd-port PORT] [--font-style termux] [--font-size SIZE] [--font-weight WEIGHT] [--line-height HEIGHT] [--terminal-padding CSS_LENGTH] [-- COMMAND...]\n' "$0"
 }
 
 font_family_for_style() {
   case "$1" in
-    monospace) printf 'monospace' ;;
-    sans) printf 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' ;;
-    serif) printf 'Georgia, "Times New Roman", serif' ;;
-    jetbrains) printf '"JetBrains Mono", monospace' ;;
-    fira) printf '"Fira Code", monospace' ;;
-    hack) printf 'Hack, monospace' ;;
-    source-code-pro) printf '"Source Code Pro", monospace' ;;
-    noto) printf '"Noto Sans Mono", monospace' ;;
+    termux) printf '"TermuxTtydPwaFont", monospace' ;;
     *) return 1 ;;
   esac
 }
@@ -95,6 +89,122 @@ print(json.dumps(theme, ensure_ascii=True, separators=(",", ":")))
 PY
 }
 
+create_ttyd_index() {
+  local output_path="$1"
+  local font_path="$2"
+  local probe_port
+  local probe_pid
+
+  probe_port="$(python3 - <<'PY'
+import socket
+
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+    sock.bind(("127.0.0.1", 0))
+    print(sock.getsockname()[1])
+PY
+)"
+
+  ttyd --interface 127.0.0.1 --port "$probe_port" sh -c 'sleep 10' >/dev/null 2>&1 &
+  probe_pid="$!"
+
+  local status=0
+  python3 - "$probe_port" "$output_path" "$font_path" <<'PY' || status="$?"
+import base64
+import sys
+import time
+import urllib.request
+
+port, output_path, font_path = sys.argv[1:]
+url = f"http://127.0.0.1:{port}/"
+last_error = None
+
+for _ in range(30):
+    try:
+        with urllib.request.urlopen(url, timeout=1) as response:
+            html = response.read().decode("utf-8")
+        break
+    except Exception as error:
+        last_error = error
+        time.sleep(0.1)
+else:
+    raise SystemExit(f"Failed to read ttyd default index: {last_error}")
+
+with open(font_path, "rb") as file:
+    font_data = base64.b64encode(file.read()).decode("ascii")
+
+style = (
+    '<style id="termux-ttyd-pwa-font">'
+    '@font-face{font-family:"TermuxTtydPwaFont";'
+    f'src:url(data:font/ttf;base64,{font_data}) format("truetype");'
+    'font-display:block;}'
+    '</style>'
+)
+
+if "</head>" not in html:
+    raise SystemExit("ttyd default index does not contain </head>")
+
+with open(output_path, "w", encoding="utf-8") as file:
+    file.write(html.replace("</head>", style + "</head>", 1))
+PY
+
+  kill "$probe_pid" 2>/dev/null || true
+  wait "$probe_pid" 2>/dev/null || true
+  return "$status"
+}
+
+termux_font_file() {
+  local path
+  for path in \
+    "${TERMUX_FONT_FILE:-}" \
+    "${HOME:-}/.termux/font.ttf" \
+    "/data/data/com.termux/files/home/.termux/font.ttf"; do
+    if [ -n "$path" ] && [ -f "$path" ]; then
+      printf '%s\n' "$path"
+      return 0
+    fi
+  done
+  return 1
+}
+
+termux_font_defaults() {
+  python3 - "$FONT_SIZE" "$FONT_WEIGHT" "$LINE_HEIGHT" "${TERMUX_PROPERTIES_FILE:-}" "${HOME:-}/.termux/termux.properties" "/data/data/com.termux/files/home/.termux/termux.properties" <<'PY'
+import os
+import shlex
+import sys
+
+font_size, font_weight, line_height = sys.argv[1:4]
+paths = [os.path.expanduser(path) for path in sys.argv[4:] if path]
+path = next((candidate for candidate in paths if os.path.isfile(candidate)), None)
+
+values = {}
+if path:
+    with open(path, encoding="utf-8") as file:
+        for line in file:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = [part.strip() for part in line.split("=", 1)]
+            values[key] = value
+
+def pick(keys, default):
+    for key in keys:
+        value = values.get(key)
+        if value:
+            return value
+    return default
+
+font_size = pick(("font-size", "font.size", "font_size", "terminal-font-size", "terminal.font-size", "terminal_font_size"), font_size)
+font_weight = pick(("font-weight", "font.weight", "font_weight", "terminal-font-weight", "terminal.font-weight", "terminal_font_weight"), font_weight)
+line_height = pick(("line-height", "line.height", "line_height", "terminal-line-height", "terminal.line-height", "terminal_line_height"), line_height)
+
+print(f"FONT_SIZE={shlex.quote(font_size)}")
+print(f"FONT_WEIGHT={shlex.quote(font_weight)}")
+print(f"LINE_HEIGHT={shlex.quote(line_height)}")
+PY
+}
+
+eval "$(termux_font_defaults)"
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --host)
@@ -112,18 +222,12 @@ while [ "$#" -gt 0 ]; do
       TTYD_PORT="$2"
       shift 2
       ;;
-    --font-family)
-      require_value "$@"
-      FONT_FAMILY="$2"
-      FONT_STYLE="custom"
-      shift 2
-      ;;
     --font-style)
       require_value "$@"
       FONT_STYLE="$2"
       if ! FONT_FAMILY="$(font_family_for_style "$FONT_STYLE")"; then
         printf 'Unknown font style: %s\n' "$FONT_STYLE" >&2
-        printf 'Available styles: monospace, sans, serif, jetbrains, fira, hack, source-code-pro, noto\n' >&2
+        printf 'Available styles: termux\n' >&2
         exit 2
       fi
       shift 2
@@ -131,6 +235,11 @@ while [ "$#" -gt 0 ]; do
     --font-size)
       require_value "$@"
       FONT_SIZE="$2"
+      shift 2
+      ;;
+    --font-weight)
+      require_value "$@"
+      FONT_WEIGHT="$2"
       shift 2
       ;;
     --line-height)
@@ -177,6 +286,7 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 TERMINAL_THEME="$(termux_theme)"
+TERMUX_CONFIGURED_FONT_FILE="$(termux_font_file || true)"
 
 cleanup() {
   if [ -n "${TTYD_PID:-}" ]; then kill "$TTYD_PID" 2>/dev/null || true; fi
@@ -186,6 +296,17 @@ trap cleanup EXIT INT TERM
 
 PUBLIC_DIR="$(mktemp -d "${TMPDIR:-/tmp}/termux-ttyd-pwa.XXXXXX")"
 cp -R "$APP_DIR/public/." "$PUBLIC_DIR/"
+TTYD_INDEX_OPTION=()
+
+if [ -n "$TERMUX_CONFIGURED_FONT_FILE" ]; then
+  TTYD_INDEX_FILE="$PUBLIC_DIR/ttyd-index.html"
+  create_ttyd_index "$TTYD_INDEX_FILE" "$TERMUX_CONFIGURED_FONT_FILE"
+  TTYD_INDEX_OPTION=(--index "$TTYD_INDEX_FILE")
+elif [ "$FONT_STYLE" = "termux" ]; then
+  printf 'Termux font file was not found. Set ~/.termux/font.ttf or TERMUX_FONT_FILE.\n' >&2
+  exit 1
+fi
+
 python3 - "$PUBLIC_DIR/config.js" "$FONT_STYLE" "$FONT_FAMILY" "$TERMINAL_PADDING" <<'PY'
 import json
 import sys
@@ -206,8 +327,10 @@ ttyd \
   --writable \
   --interface "$HOST" \
   --port "$TTYD_PORT" \
+  "${TTYD_INDEX_OPTION[@]}" \
   --client-option "fontFamily=$FONT_FAMILY" \
   --client-option "fontSize=$FONT_SIZE" \
+  --client-option "fontWeight=$FONT_WEIGHT" \
   --client-option "lineHeight=$LINE_HEIGHT" \
   --client-option "theme=$TERMINAL_THEME" \
   "${COMMAND[@]}" &
@@ -215,7 +338,7 @@ TTYD_PID="$!"
 
 printf 'ttyd: http://%s:%s/\n' "$HOST" "$TTYD_PORT"
 printf 'PWA:  http://%s:%s/\n' "$HOST" "$APP_PORT"
-printf 'Font: style=%s family=%s size=%s line-height=%s\n' "$FONT_STYLE" "$FONT_FAMILY" "$FONT_SIZE" "$LINE_HEIGHT"
+printf 'Font: style=%s family=%s size=%s weight=%s line-height=%s\n' "$FONT_STYLE" "$FONT_FAMILY" "$FONT_SIZE" "$FONT_WEIGHT" "$LINE_HEIGHT"
 printf 'Terminal padding: %s\n' "$TERMINAL_PADDING"
 
 python3 -m http.server "$APP_PORT" --bind "$HOST" --directory "$PUBLIC_DIR"

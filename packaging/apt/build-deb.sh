@@ -23,13 +23,14 @@ mkdir -p \
 
 install -m 755 "$ROOT_DIR/bin/termux-ttyd-pwa" "$BUILD_DIR$TERMUX_PREFIX/bin/termux-ttyd-pwa"
 cp -R "$ROOT_DIR/public" "$BUILD_DIR$TERMUX_PREFIX/share/$PACKAGE/public"
+INSTALLED_SIZE="$(du -sk "$BUILD_DIR$TERMUX_PREFIX" | cut -f1)"
 
 cat > "$BUILD_DIR/DEBIAN/control" <<EOF
 Package: $PACKAGE
 Version: $VERSION
 Architecture: $ARCHITECTURE
 Maintainer: Soichiro Fujioka <noreply@example.com>
-Installed-Size: 64
+Installed-Size: $INSTALLED_SIZE
 Depends: python, ttyd
 Homepage: https://github.com/Soichiro-Fujioka/termux-ttyd-pwa
 Description: Mobile-friendly PWA wrapper for ttyd on Termux

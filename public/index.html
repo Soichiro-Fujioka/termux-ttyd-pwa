@@ -34,18 +34,10 @@
           <label>
             Font style
             <select id="fontStyle" name="fontStyle">
-              <option value="monospace">Monospace</option>
-              <option value="sans">Sans</option>
-              <option value="serif">Serif</option>
-              <option value="jetbrains">JetBrains Mono</option>
-              <option value="fira">Fira Code</option>
-              <option value="hack">Hack</option>
-              <option value="source-code-pro">Source Code Pro</option>
-              <option value="noto">Noto Sans Mono</option>
-              <option value="custom">Custom startup font</option>
+              <option value="termux">Termux font</option>
             </select>
           </label>
-          <p class="settings-note">Font style is applied by the startup command. Change it with <code>--font-style</code>, then reload the app.</p>
+          <p class="settings-note">Font style is fixed to the Termux font loaded from <code>~/.termux/font.ttf</code> or <code>TERMUX_FONT_FILE</code>.</p>
           <div class="settings-actions">
             <button class="button primary" type="submit">Apply</button>
             <button id="reloadTerminal" class="button" type="button">Reload</button>

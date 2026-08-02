@@ -31,13 +31,13 @@ Open `http://127.0.0.1:8080/` in Android Chrome or another PWA-capable browser.
 ## Startup Options
 
 ```sh
-./scripts/start.sh --font-style jetbrains --font-size 18 --terminal-padding 12px
+./scripts/start.sh --font-size 18 --terminal-padding 12px
 ```
 
 Installed package usage is the same:
 
 ```sh
-termux-ttyd-pwa --font-style jetbrains --font-size 18 --terminal-padding 12px
+termux-ttyd-pwa --font-size 18 --terminal-padding 12px
 ```
 
 Useful options:
@@ -45,14 +45,18 @@ Useful options:
 - `--host 127.0.0.1`
 - `--app-port 8080`
 - `--ttyd-port 7681`
-- `--font-style monospace`
-- `--font-family monospace`
+- `--font-style termux`
 - `--font-size 14`
+- `--font-weight normal`
 - `--line-height 1.2`
 - `--terminal-padding 0`
 - `-- COMMAND...`
 
-Available font styles are `monospace`, `sans`, `serif`, `jetbrains`, `fira`, `hack`, `source-code-pro`, and `noto`. Use `--font-family` when you want to pass a custom CSS font family directly to `ttyd`.
+The only supported font style is `termux`. It uses the font file configured for Termux at `~/.termux/font.ttf`, or the path specified by `TERMUX_FONT_FILE`. The font is read at startup and injected into the temporary `ttyd` page, so the package does not redistribute font files and does not depend on Android system fonts.
+
+Font size, font weight, and line height default to values read from Termux settings when present. The startup command checks `~/.termux/termux.properties` or `TERMUX_PROPERTIES_FILE` for keys such as `font-size`, `font-weight`, and `line-height`. Command line options like `--font-size`, `--font-weight`, and `--line-height` override those defaults.
+
+Because the app reads Termux-side files such as `~/.termux/font.ttf`, `~/.termux/termux.properties`, and `~/.termux/colors.properties`, running it directly on native Termux is recommended. Running from proot or another environment can work only if those files are visible through the same paths or are explicitly provided with `TERMUX_FONT_FILE`, `TERMUX_PROPERTIES_FILE`, and `TERMUX_COLORS_FILE`.
 
 Example with a custom shell command:
 

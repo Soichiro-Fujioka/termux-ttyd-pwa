@@ -2,7 +2,7 @@
   var defaults = {
     ttydUrl: window.location.protocol + "//" + window.location.hostname + ":7681/",
     terminalPadding: "0",
-    fontStyle: "monospace"
+    fontStyle: "termux"
   };
   var startupConfig = window.TERMUX_TTYD_PWA_CONFIG || {};
 
