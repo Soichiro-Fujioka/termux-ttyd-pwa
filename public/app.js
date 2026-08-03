@@ -65,9 +65,31 @@
     }
   }
 
+  function isAllowedTtydUrl(value) {
+    var url;
+
+    try {
+      url = new URL(value, window.location.href);
+    } catch (error) {
+      return false;
+    }
+
+    return (url.protocol === "http:" || url.protocol === "https:") && (
+      url.hostname === window.location.hostname ||
+      url.hostname === "127.0.0.1" ||
+      url.hostname === "localhost" ||
+      url.hostname === "[::1]"
+    );
+  }
+
+  function normalizeTtydUrl(value) {
+    var normalized = normalizeUrl(value);
+    return isAllowedTtydUrl(normalized) ? normalized : defaults.ttydUrl;
+  }
+
   function loadTerminal(settings) {
     applyLayout(settings);
-    frame.src = normalizeUrl(settings.ttydUrl);
+    frame.src = normalizeTtydUrl(settings.ttydUrl);
   }
 
   function focusFrame() {
@@ -139,8 +161,14 @@
 
   form.addEventListener("submit", function (event) {
     event.preventDefault();
+    if (!isAllowedTtydUrl(ttydUrlInput.value)) {
+      ttydUrlInput.setCustomValidity("Use an http(s) URL on the same host, localhost, 127.0.0.1, or ::1.");
+      ttydUrlInput.reportValidity();
+      return;
+    }
+    ttydUrlInput.setCustomValidity("");
     settings = {
-      ttydUrl: normalizeUrl(ttydUrlInput.value),
+      ttydUrl: normalizeTtydUrl(ttydUrlInput.value),
       terminalPadding: terminalPaddingInput.value.trim() || "0",
       fontStyle: fontStyleInput.value
     };

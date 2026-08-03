@@ -316,6 +316,15 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
+case "$HOST" in
+  127.0.0.1|localhost|::1)
+    ;;
+  *)
+    printf 'WARNING: --host %s exposes a writable ttyd terminal without authentication.\n' "$HOST" >&2
+    printf 'Anyone on the reachable network may be able to control this shell. Use only on trusted networks.\n' >&2
+    ;;
+esac
+
 TERMINAL_THEME="$(termux_theme)"
 TERMUX_CONFIGURED_FONT_FILE="$(termux_font_file || true)"
 
