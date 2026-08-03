@@ -17,6 +17,8 @@ APP_PORT="8080"
 TTYD_PORT="7681"
 FONT_FAMILY='"TermuxTtydPwaFont", monospace'
 FONT_STYLE="termux"
+COPY_TERMUX_FONT="yes"
+ANDROID_FONT_FAMILY="monospace"
 FONT_SIZE="14"
 FONT_WEIGHT="normal"
 LETTER_SPACING="0"
@@ -26,7 +28,7 @@ TERMINAL_THEME='{"foreground":"#ffffff","background":"#000000","cursor":"#ffffff
 COMMAND=("${SHELL:-bash}")
 
 usage() {
-  printf 'Usage: %s [--host HOST] [--app-port PORT] [--ttyd-port PORT] [--font-style termux] [--font-size SIZE] [--font-weight WEIGHT] [--letter-spacing SPACING] [--line-height HEIGHT] [--terminal-padding CSS_LENGTH] [-- COMMAND...]\n' "$0"
+  printf 'Usage: %s [--host HOST] [--app-port PORT] [--ttyd-port PORT] [--font-style termux] [--copy-termux-font yes|no] [--android-font-family FAMILY] [--font-size SIZE] [--font-weight WEIGHT] [--letter-spacing SPACING] [--line-height HEIGHT] [--terminal-padding CSS_LENGTH] [-- COMMAND...]\n' "$0"
 }
 
 font_family_for_style() {
@@ -41,6 +43,17 @@ require_value() {
     printf '%s requires a value.\n' "$1" >&2
     exit 2
   fi
+}
+
+normalize_yes_no() {
+  case "$2" in
+    yes|true|1|on) printf 'yes' ;;
+    no|false|0|off) printf 'no' ;;
+    *)
+      printf '%s must be yes or no.\n' "$1" >&2
+      exit 2
+      ;;
+  esac
 }
 
 termux_theme() {
@@ -235,6 +248,16 @@ while [ "$#" -gt 0 ]; do
       fi
       shift 2
       ;;
+    --copy-termux-font)
+      require_value "$@"
+      COPY_TERMUX_FONT="$(normalize_yes_no "$1" "$2")"
+      shift 2
+      ;;
+    --android-font-family)
+      require_value "$@"
+      ANDROID_FONT_FAMILY="$2"
+      shift 2
+      ;;
     --font-size)
       require_value "$@"
       FONT_SIZE="$2"
@@ -296,6 +319,14 @@ fi
 TERMINAL_THEME="$(termux_theme)"
 TERMUX_CONFIGURED_FONT_FILE="$(termux_font_file || true)"
 
+if [ "$COPY_TERMUX_FONT" = "no" ]; then
+  FONT_STYLE="android"
+  FONT_FAMILY="$ANDROID_FONT_FAMILY"
+else
+  FONT_STYLE="termux"
+  FONT_FAMILY='"TermuxTtydPwaFont", monospace'
+fi
+
 cleanup() {
   if [ -n "${TTYD_PID:-}" ]; then kill "$TTYD_PID" 2>/dev/null || true; fi
   if [ -n "${PUBLIC_DIR:-}" ] && [ -d "$PUBLIC_DIR" ]; then rm -rf "$PUBLIC_DIR"; fi
@@ -306,11 +337,11 @@ PUBLIC_DIR="$(mktemp -d "${TMPDIR:-/tmp}/termux-ttyd-pwa.XXXXXX")"
 cp -R "$APP_DIR/public/." "$PUBLIC_DIR/"
 TTYD_INDEX_OPTION=()
 
-if [ -n "$TERMUX_CONFIGURED_FONT_FILE" ]; then
+if [ "$COPY_TERMUX_FONT" = "yes" ] && [ -n "$TERMUX_CONFIGURED_FONT_FILE" ]; then
   TTYD_INDEX_FILE="$PUBLIC_DIR/ttyd-index.html"
   create_ttyd_index "$TTYD_INDEX_FILE" "$TERMUX_CONFIGURED_FONT_FILE"
   TTYD_INDEX_OPTION=(--index "$TTYD_INDEX_FILE")
-elif [ "$FONT_STYLE" = "termux" ]; then
+elif [ "$COPY_TERMUX_FONT" = "yes" ]; then
   printf 'Termux font file was not found. Set ~/.termux/font.ttf or TERMUX_FONT_FILE.\n' >&2
   exit 1
 fi
@@ -347,6 +378,7 @@ TTYD_PID="$!"
 
 printf 'ttyd: http://%s:%s/\n' "$HOST" "$TTYD_PORT"
 printf 'PWA:  http://%s:%s/\n' "$HOST" "$APP_PORT"
+printf 'Termux font copy: %s\n' "$COPY_TERMUX_FONT"
 printf 'Font: style=%s family=%s size=%s weight=%s letter-spacing=%s line-height=%s\n' "$FONT_STYLE" "$FONT_FAMILY" "$FONT_SIZE" "$FONT_WEIGHT" "$LETTER_SPACING" "$LINE_HEIGHT"
 printf 'Terminal padding: %s\n' "$TERMINAL_PADDING"
 

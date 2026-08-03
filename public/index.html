@@ -35,9 +35,10 @@
             Font style
             <select id="fontStyle" name="fontStyle">
               <option value="termux">Termux font</option>
+              <option value="android">Android system font</option>
             </select>
           </label>
-          <p class="settings-note">Font style is fixed to the Termux font loaded from <code>~/.termux/font.ttf</code> or <code>TERMUX_FONT_FILE</code>.</p>
+          <p class="settings-note">Font style is set at startup. Termux font copy uses <code>~/.termux/font.ttf</code> or <code>TERMUX_FONT_FILE</code> and takes priority over Android font settings.</p>
           <div class="settings-actions">
             <button class="button primary" type="submit">Apply</button>
             <button id="reloadTerminal" class="button" type="button">Reload</button>
