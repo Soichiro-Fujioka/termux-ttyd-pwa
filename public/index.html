@@ -20,6 +20,7 @@
       <div class="drawer-grip" aria-hidden="true"></div>
       <button id="settingsToggle" class="drawer-action" type="button" aria-expanded="false" aria-controls="settingsPanel">Settings</button>
       <button id="fullscreenToggle" class="drawer-action" type="button" aria-pressed="false">Fullscreen</button>
+      <button id="reloadTerminal" class="drawer-action" type="button">Reload</button>
 
       <section id="settingsPanel" class="settings-panel" hidden>
         <form id="settingsForm" class="settings-form">
@@ -41,7 +42,6 @@
           <p class="settings-note">Font style is set at startup. Termux font copy uses <code>~/.termux/font.ttf</code> or <code>TERMUX_FONT_FILE</code> and takes priority over Android font settings.</p>
           <div class="settings-actions">
             <button class="button primary" type="submit">Apply</button>
-            <button id="reloadTerminal" class="button" type="button">Reload</button>
           </div>
         </form>
       </section>

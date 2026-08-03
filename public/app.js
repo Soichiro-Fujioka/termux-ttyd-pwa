@@ -134,7 +134,7 @@
 
   reloadTerminal.addEventListener("click", function () {
     loadTerminal(settings);
-    focusFrame();
+    closeDrawer();
   });
 
   form.addEventListener("submit", function (event) {
