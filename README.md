@@ -48,13 +48,16 @@ Useful options:
 - `--font-style termux`
 - `--font-size 14`
 - `--font-weight normal`
+- `--letter-spacing 0`
 - `--line-height 1.2`
 - `--terminal-padding 0`
 - `-- COMMAND...`
 
 The only supported font style is `termux`. It uses the font file configured for Termux at `~/.termux/font.ttf`, or the path specified by `TERMUX_FONT_FILE`. The font is read at startup and injected into the temporary `ttyd` page, so the package does not redistribute font files and does not depend on Android system fonts.
 
-Font size, font weight, and line height default to values read from Termux settings when present. The startup command checks `~/.termux/termux.properties` or `TERMUX_PROPERTIES_FILE` for keys such as `font-size`, `font-weight`, and `line-height`. Command line options like `--font-size`, `--font-weight`, and `--line-height` override those defaults.
+Font size, font weight, letter spacing, and line height default to values read from Termux settings when present. The startup command checks `~/.termux/termux.properties` or `TERMUX_PROPERTIES_FILE` for keys such as `font-size`, `font-weight`, `letter-spacing`, and `line-height`. Command line options like `--font-size`, `--font-weight`, `--letter-spacing`, and `--line-height` override those defaults.
+
+Termux native rendering and browser rendering are not identical, so character width may still differ depending on the font. If the browser terminal looks too wide, start with a negative letter spacing such as `--letter-spacing -1` and adjust from there.
 
 Because the app reads Termux-side files such as `~/.termux/font.ttf`, `~/.termux/termux.properties`, and `~/.termux/colors.properties`, running it directly on native Termux is recommended. Running from proot or another environment can work only if those files are visible through the same paths or are explicitly provided with `TERMUX_FONT_FILE`, `TERMUX_PROPERTIES_FILE`, and `TERMUX_COLORS_FILE`.
 

@@ -19,13 +19,14 @@ FONT_FAMILY='"TermuxTtydPwaFont", monospace'
 FONT_STYLE="termux"
 FONT_SIZE="14"
 FONT_WEIGHT="normal"
+LETTER_SPACING="0"
 LINE_HEIGHT="1.2"
 TERMINAL_PADDING="0"
 TERMINAL_THEME='{"foreground":"#ffffff","background":"#000000","cursor":"#ffffff","cursorAccent":"#000000","selectionBackground":"#4d4d4d","black":"#000000","red":"#cc0000","green":"#00cc00","yellow":"#cccc00","blue":"#0000cc","magenta":"#cc00cc","cyan":"#00cccc","white":"#cccccc","brightBlack":"#666666","brightRed":"#ff0000","brightGreen":"#00ff00","brightYellow":"#ffff00","brightBlue":"#0000ff","brightMagenta":"#ff00ff","brightCyan":"#00ffff","brightWhite":"#ffffff"}'
 COMMAND=("${SHELL:-bash}")
 
 usage() {
-  printf 'Usage: %s [--host HOST] [--app-port PORT] [--ttyd-port PORT] [--font-style termux] [--font-size SIZE] [--font-weight WEIGHT] [--line-height HEIGHT] [--terminal-padding CSS_LENGTH] [-- COMMAND...]\n' "$0"
+  printf 'Usage: %s [--host HOST] [--app-port PORT] [--ttyd-port PORT] [--font-style termux] [--font-size SIZE] [--font-weight WEIGHT] [--letter-spacing SPACING] [--line-height HEIGHT] [--terminal-padding CSS_LENGTH] [-- COMMAND...]\n' "$0"
 }
 
 font_family_for_style() {
@@ -167,13 +168,13 @@ termux_font_file() {
 }
 
 termux_font_defaults() {
-  python3 - "$FONT_SIZE" "$FONT_WEIGHT" "$LINE_HEIGHT" "${TERMUX_PROPERTIES_FILE:-}" "${HOME:-}/.termux/termux.properties" "/data/data/com.termux/files/home/.termux/termux.properties" <<'PY'
+  python3 - "$FONT_SIZE" "$FONT_WEIGHT" "$LETTER_SPACING" "$LINE_HEIGHT" "${TERMUX_PROPERTIES_FILE:-}" "${HOME:-}/.termux/termux.properties" "/data/data/com.termux/files/home/.termux/termux.properties" <<'PY'
 import os
 import shlex
 import sys
 
-font_size, font_weight, line_height = sys.argv[1:4]
-paths = [os.path.expanduser(path) for path in sys.argv[4:] if path]
+font_size, font_weight, letter_spacing, line_height = sys.argv[1:5]
+paths = [os.path.expanduser(path) for path in sys.argv[5:] if path]
 path = next((candidate for candidate in paths if os.path.isfile(candidate)), None)
 
 values = {}
@@ -195,10 +196,12 @@ def pick(keys, default):
 
 font_size = pick(("font-size", "font.size", "font_size", "terminal-font-size", "terminal.font-size", "terminal_font_size"), font_size)
 font_weight = pick(("font-weight", "font.weight", "font_weight", "terminal-font-weight", "terminal.font-weight", "terminal_font_weight"), font_weight)
+letter_spacing = pick(("letter-spacing", "letter.spacing", "letter_spacing", "font-letter-spacing", "font.letter-spacing", "font_letter_spacing", "terminal-letter-spacing", "terminal.letter-spacing", "terminal_letter_spacing", "terminal-character-spacing", "terminal.character-spacing", "terminal_character_spacing"), letter_spacing)
 line_height = pick(("line-height", "line.height", "line_height", "terminal-line-height", "terminal.line-height", "terminal_line_height"), line_height)
 
 print(f"FONT_SIZE={shlex.quote(font_size)}")
 print(f"FONT_WEIGHT={shlex.quote(font_weight)}")
+print(f"LETTER_SPACING={shlex.quote(letter_spacing)}")
 print(f"LINE_HEIGHT={shlex.quote(line_height)}")
 PY
 }
@@ -240,6 +243,11 @@ while [ "$#" -gt 0 ]; do
     --font-weight)
       require_value "$@"
       FONT_WEIGHT="$2"
+      shift 2
+      ;;
+    --letter-spacing)
+      require_value "$@"
+      LETTER_SPACING="$2"
       shift 2
       ;;
     --line-height)
@@ -331,6 +339,7 @@ ttyd \
   --client-option "fontFamily=$FONT_FAMILY" \
   --client-option "fontSize=$FONT_SIZE" \
   --client-option "fontWeight=$FONT_WEIGHT" \
+  --client-option "letterSpacing=$LETTER_SPACING" \
   --client-option "lineHeight=$LINE_HEIGHT" \
   --client-option "theme=$TERMINAL_THEME" \
   "${COMMAND[@]}" &
@@ -338,7 +347,7 @@ TTYD_PID="$!"
 
 printf 'ttyd: http://%s:%s/\n' "$HOST" "$TTYD_PORT"
 printf 'PWA:  http://%s:%s/\n' "$HOST" "$APP_PORT"
-printf 'Font: style=%s family=%s size=%s weight=%s line-height=%s\n' "$FONT_STYLE" "$FONT_FAMILY" "$FONT_SIZE" "$FONT_WEIGHT" "$LINE_HEIGHT"
+printf 'Font: style=%s family=%s size=%s weight=%s letter-spacing=%s line-height=%s\n' "$FONT_STYLE" "$FONT_FAMILY" "$FONT_SIZE" "$FONT_WEIGHT" "$LETTER_SPACING" "$LINE_HEIGHT"
 printf 'Terminal padding: %s\n' "$TERMINAL_PADDING"
 
 python3 -m http.server "$APP_PORT" --bind "$HOST" --directory "$PUBLIC_DIR"
