@@ -1,1 +1,1 @@
-deb [trusted=yes] https://soichiro-fujioka.github.io/termux-ttyd-pwa stable main
+deb [signed-by=/data/data/com.termux/files/usr/etc/apt/trusted.gpg.d/termux-ttyd-pwa-archive-keyring.gpg] https://soichiro-fujioka.github.io/termux-ttyd-pwa stable main

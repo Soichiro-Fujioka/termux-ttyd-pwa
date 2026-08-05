@@ -90,7 +90,14 @@ After opening the app in a supported browser, use the browser menu to install it
 On Termux, users can add your repository with:
 
 ```sh
+curl -fsSL https://soichiro-fujioka.github.io/termux-ttyd-pwa/termux-ttyd-pwa-archive-keyring.gpg -o "$PREFIX/etc/apt/trusted.gpg.d/termux-ttyd-pwa-archive-keyring.gpg"
 curl -fsSL https://soichiro-fujioka.github.io/termux-ttyd-pwa/termux-ttyd-pwa.list -o "$PREFIX/etc/apt/sources.list.d/termux-ttyd-pwa.list"
+```
+
+The APT repository is signed with this key fingerprint:
+
+```text
+C94B 7C3C 81CE C096 959D  677D 2FCA 3DB5 F98C 433F
 ```
 
 Then install:
@@ -100,6 +107,26 @@ pkg update
 pkg install termux-ttyd-pwa
 termux-ttyd-pwa
 ```
+
+### Publishing the APT Repository
+
+The `Publish APT repository` GitHub Actions workflow builds the `.deb`, signs the APT repository metadata, and deploys `dist/apt-repo` to GitHub Pages.
+
+Configure GitHub Pages to use GitHub Actions as the source, then add this repository secret:
+
+- `APT_GPG_PRIVATE_KEY`: armored private key for the APT signing key
+
+If the signing key has a passphrase, also add:
+
+- `APT_GPG_PASSPHRASE`: passphrase for the APT signing key
+
+Export the private key with:
+
+```sh
+gpg --armor --export-secret-keys C94B7C3C81CEC096959D677D2FCA3DB5F98C433F
+```
+
+Do not commit the exported private key.
 
 ## Notes
 

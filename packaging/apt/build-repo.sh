@@ -8,6 +8,7 @@ PACKAGE="termux-ttyd-pwa"
 COMPONENT="main"
 SUITE="stable"
 ARCHES=(aarch64 arm i686 x86_64)
+SIGNING_KEY="${APT_SIGNING_KEY:-C94B7C3C81CEC096959D677D2FCA3DB5F98C433F}"
 
 if [ ! -d "$DEB_DIR" ]; then
   printf 'No deb directory found at %s. Run packaging/apt/build-deb.sh first.\n' "$DEB_DIR" >&2
@@ -17,6 +18,7 @@ fi
 rm -rf "$REPO_DIR"
 mkdir -p "$REPO_DIR/pool/main/t/$PACKAGE" "$REPO_DIR/dists/$SUITE/$COMPONENT"
 cp "$ROOT_DIR/packaging/apt/termux-ttyd-pwa.list" "$REPO_DIR/termux-ttyd-pwa.list"
+cp "$ROOT_DIR/packaging/apt/termux-ttyd-pwa-archive-keyring.gpg" "$REPO_DIR/termux-ttyd-pwa-archive-keyring.gpg"
 
 shopt -s nullglob
 DEBS=("$DEB_DIR"/*.deb)
@@ -99,5 +101,13 @@ append_hashes() {
 append_hashes "MD5Sum" md5sum
 append_hashes "SHA1" sha1sum
 append_hashes "SHA256" sha256sum
+
+GPG_SIGN_ARGS=(--batch --yes --local-user "$SIGNING_KEY")
+if [ -n "${APT_GPG_PASSPHRASE:-}" ]; then
+  GPG_SIGN_ARGS+=(--pinentry-mode loopback --passphrase "$APT_GPG_PASSPHRASE")
+fi
+
+gpg "${GPG_SIGN_ARGS[@]}" --clearsign --output "$REPO_DIR/dists/$SUITE/InRelease" "$RELEASE_FILE"
+gpg "${GPG_SIGN_ARGS[@]}" --detach-sign --armor --output "$RELEASE_FILE.gpg" "$RELEASE_FILE"
 
 printf 'Built APT repository at %s\n' "$REPO_DIR"
