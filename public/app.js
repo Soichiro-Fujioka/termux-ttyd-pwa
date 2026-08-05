@@ -1,8 +1,7 @@
 (function () {
   var defaults = {
     ttydUrl: window.location.protocol + "//" + window.location.hostname + ":7681/",
-    terminalPadding: "0",
-    fontStyle: "termux"
+    terminalPadding: "0"
   };
   var startupConfig = window.TERMUX_TTYD_PWA_CONFIG || {};
 
@@ -18,7 +17,6 @@
   var form = document.getElementById("settingsForm");
   var ttydUrlInput = document.getElementById("ttydUrl");
   var terminalPaddingInput = document.getElementById("terminalPadding");
-  var fontStyleInput = document.getElementById("fontStyle");
 
   function readSettings() {
     try {
@@ -35,7 +33,6 @@
   function applyForm(settings) {
     ttydUrlInput.value = settings.ttydUrl;
     terminalPaddingInput.value = settings.terminalPadding;
-    fontStyleInput.value = settings.fontStyle;
   }
 
   function applyLayout(settings) {
@@ -169,8 +166,7 @@
     ttydUrlInput.setCustomValidity("");
     settings = {
       ttydUrl: normalizeTtydUrl(ttydUrlInput.value),
-      terminalPadding: terminalPaddingInput.value.trim() || "0",
-      fontStyle: fontStyleInput.value
+      terminalPadding: terminalPaddingInput.value.trim() || "0"
     };
     writeSettings(settings);
     applyForm(settings);
