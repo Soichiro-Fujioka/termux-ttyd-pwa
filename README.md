@@ -28,6 +28,8 @@ termux-ttyd-pwa
 
 Open `http://127.0.0.1:8080/` in Android Chrome or another PWA-capable browser.
 
+For security, the app is intended to be used locally on `127.0.0.1`. Avoid changing `--host` to a network-reachable address unless you fully trust the network, because the embedded `ttyd` terminal is writable and can control your shell.
+
 ## Startup Options
 
 ```sh
@@ -131,5 +133,6 @@ Do not commit the exported private key.
 ## Notes
 
 - The embedded terminal defaults to `http://127.0.0.1:7681/`.
+- Local startup on `127.0.0.1` is recommended. Exposing the app or `ttyd` to a LAN or the internet can allow other devices to operate your shell if they can reach the port.
 - Runtime font changes are shown as a selected startup style in the PWA settings because the embedded `ttyd` page runs on another port. Use startup font options to change the actual terminal font.
 - The IME button is intentionally simple. It keeps focus behavior predictable and avoids interfering with Japanese composition events.
