@@ -36,7 +36,15 @@
   }
 
   function applyLayout(settings) {
-    document.documentElement.style.setProperty("--terminal-padding", settings.terminalPadding || "0");
+    document.documentElement.style.setProperty("--terminal-padding", normalizeTerminalPadding(settings.terminalPadding));
+  }
+
+  function normalizeTerminalPadding(value) {
+    var padding = String(value || "").trim();
+
+    if (!padding) return "0";
+    if (/^-?\d+(?:\.\d+)?$/.test(padding) && padding !== "0") return padding + "px";
+    return padding;
   }
 
   function openDrawer() {
@@ -166,7 +174,7 @@
     ttydUrlInput.setCustomValidity("");
     settings = {
       ttydUrl: normalizeTtydUrl(ttydUrlInput.value),
-      terminalPadding: terminalPaddingInput.value.trim() || "0"
+      terminalPadding: normalizeTerminalPadding(terminalPaddingInput.value)
     };
     writeSettings(settings);
     applyForm(settings);
