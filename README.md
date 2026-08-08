@@ -240,6 +240,12 @@ termux-ttyd-pwa --tmux-session main -- proot-distro login ubuntu -- tmux new -A 
 
 `ttyd` starts its command for each browser terminal connection. `--tmux-session main` makes reconnects attach to the native Termux tmux session instead, so the `proot` process is only created when that native tmux session does not already exist.
 
+If Ubuntu already starts tmux automatically during login, do not use `--tmux-session`. That option creates and attaches to a native Termux tmux session, so using it in this case would start tmux on both the native Termux side and the Ubuntu side:
+
+```sh
+termux-ttyd-pwa -- proot-distro login ubuntu
+```
+
 If you do not need `proot`, you can use the same option with a normal shell or tmux command:
 
 ```sh
