@@ -29,6 +29,11 @@ def run_termux_clipboard(command, **kwargs):
 
 class ClipboardBridge(BaseHTTPRequestHandler):
     def do_GET(self):
+        if self.path == "/health":
+            self.send_response(204)
+            self.end_headers()
+            return
+
         if self.path != "/get":
             self.send_error(404)
             return

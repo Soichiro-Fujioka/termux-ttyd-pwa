@@ -123,10 +123,11 @@ For a source checkout, use:
 ./scripts/start.sh
 ```
 
-The bridge listens on `127.0.0.1:8765` by default. It exposes only two local endpoints:
+The bridge listens on `127.0.0.1:8765` by default. It exposes three local endpoints:
 
 - `POST /set`: writes request body to the Android clipboard
 - `GET /get`: reads the Android clipboard
+- `GET /health`: checks whether the bridge is reachable without reading the clipboard
 
 Then configure Neovim inside tmux, proot, or native Termux to call the bridge with `curl`:
 
@@ -172,18 +173,18 @@ if is_termux and vim.fn.executable("curl") == 1 then
 end
 ```
 
-For tmux, put the bridge binding after other clipboard bindings so it takes priority only inside Termux/proot:
+For tmux, put the bridge binding after other clipboard bindings so it takes priority only when the bridge is reachable. This works from native Termux and from proot as long as `127.0.0.1:8765` reaches the native Termux bridge:
 
 ```tmux
-if-shell 'command -v curl >/dev/null 2>&1 && [ -d /data/data/com.termux ]' \
+if-shell 'command -v curl >/dev/null 2>&1 && curl -fsS --max-time 1 http://127.0.0.1:8765/health >/dev/null' \
   'bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "curl -fsS --max-time 3 --data-binary @- http://127.0.0.1:8765/set"'
 ```
 
-You can also paste the Android clipboard into tmux through the bridge by loading it into a tmux buffer first:
+You can also paste the Android clipboard into tmux through the bridge by loading it into a named tmux buffer first. Use a separate key such as `prefix + P` so the normal tmux `prefix + p` buffer paste keeps working:
 
 ```tmux
-if-shell 'command -v curl >/dev/null 2>&1 && [ -d /data/data/com.termux ]' \
-  'bind p run-shell -b "curl -fsS --max-time 3 http://127.0.0.1:8765/get | tmux load-buffer - && tmux paste-buffer"'
+if-shell 'command -v curl >/dev/null 2>&1 && curl -fsS --max-time 1 http://127.0.0.1:8765/health >/dev/null' \
+  'bind P run-shell -b "curl -fsS --max-time 3 http://127.0.0.1:8765/get | tmux load-buffer -b android-clipboard - \\; paste-buffer -d -b android-clipboard -t #{pane_id}"'
 ```
 
 If the PWA terminal runs inside proot, start `termux-ttyd-pwa` from native Termux with tmux as the command:
@@ -223,7 +224,7 @@ tmux copy-mode selection and y
   -> Android clipboard is updated
 ```
 
-The tmux example above only handles copying from tmux to Android. For pasting Android clipboard text into Neovim, use Neovim paste such as `"+p`. For shell-level access, you can read the Android clipboard with:
+The tmux copy-mode example above only handles copying from tmux to Android. The `prefix + P` binding handles Android-to-tmux paste. For pasting Android clipboard text into Neovim, use Neovim paste such as `"+p`. For shell-level access, you can read the Android clipboard with:
 
 ```sh
 curl -fsS --max-time 3 http://127.0.0.1:8765/get
