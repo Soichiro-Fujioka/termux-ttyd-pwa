@@ -8,6 +8,51 @@ A lightweight PWA wrapper for `ttyd` on Android Termux. It keeps the terminal as
 - `ttyd`
 - `python3`
 
+## APT Repository Install
+
+### User Install Command
+
+On Termux, users can add your repository with:
+
+```sh
+curl -fsSL https://soichiro-fujioka.github.io/termux-ttyd-pwa/termux-ttyd-pwa-archive-keyring.gpg -o "$PREFIX/etc/apt/trusted.gpg.d/termux-ttyd-pwa-archive-keyring.gpg"
+curl -fsSL https://soichiro-fujioka.github.io/termux-ttyd-pwa/termux-ttyd-pwa.list -o "$PREFIX/etc/apt/sources.list.d/termux-ttyd-pwa.list"
+```
+
+You can verify the downloaded repository signing key with this fingerprint:
+
+```text
+C94B 7C3C 81CE C096 959D  677D 2FCA 3DB5 F98C 433F
+```
+
+Then install:
+
+```sh
+pkg update
+pkg install termux-ttyd-pwa
+termux-ttyd-pwa
+```
+
+### Publishing the APT Repository
+
+The `Publish APT repository` GitHub Actions workflow builds the `.deb`, signs the APT repository metadata, and deploys `dist/apt-repo` to GitHub Pages.
+
+Configure GitHub Pages to use GitHub Actions as the source, then add this repository secret:
+
+- `APT_GPG_PRIVATE_KEY`: armored private key for the APT signing key
+
+If the signing key has a passphrase, also add:
+
+- `APT_GPG_PASSPHRASE`: passphrase for the APT signing key
+
+Export the private key with your signing key fingerprint:
+
+```sh
+gpg --armor --export-secret-keys YOUR_SIGNING_KEY_FINGERPRINT
+```
+
+For this repository's current signing key, replace `YOUR_SIGNING_KEY_FINGERPRINT` with `C94B7C3C81CEC096959D677D2FCA3DB5F98C433F`. Do not commit the exported private key.
+
 ## Start
 
 ```sh
@@ -29,6 +74,10 @@ termux-ttyd-pwa
 Open `http://127.0.0.1:8080/` in Android Chrome or another PWA-capable browser.
 
 For security, the app is intended to be used locally on `127.0.0.1`. Avoid changing `--host` to a network-reachable address unless you fully trust the network, because the embedded `ttyd` terminal is writable and can control your shell.
+
+## PWA Install
+
+After opening the app in a supported browser, use the browser menu to install it to the Android home screen.
 
 ## Startup Options
 
@@ -143,31 +192,7 @@ The bridge listens on `127.0.0.1:8765` by default. It exposes three local endpoi
 - `GET /get`: reads the Android clipboard when Android allows the bridge process to read it
 - `GET /health`: checks whether the bridge is reachable without reading the clipboard
 
-Then configure Neovim inside tmux or proot to call the bridge with `curl`. Copy uses `/set`; paste uses `/get` only if Android allows clipboard reads from the bridge process:
-
-```lua
-vim.g.clipboard = {
-  name = "termux-clipboard-bridge",
-  copy = {
-    ["+"] = "curl -fsS --data-binary @- http://127.0.0.1:8765/set",
-    ["*"] = "curl -fsS --data-binary @- http://127.0.0.1:8765/set",
-  },
-  paste = {
-    ["+"] = "curl -fsS http://127.0.0.1:8765/get",
-    ["*"] = "curl -fsS http://127.0.0.1:8765/get",
-  }
-}
-```
-
-If `/get` is empty on your device, keep the bridge for copy-to-Android use and use another paste path for Android-to-Neovim.
-
-For tmux copy mode:
-
-```tmux
-bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "curl -fsS --data-binary @- http://127.0.0.1:8765/set"
-```
-
-If your Neovim or tmux config is shared across Termux, proot, macOS, Linux, and WSL, keep existing clipboard providers and enable the bridge only in Termux/proot. For Neovim:
+Then configure Neovim inside tmux or proot to call the bridge with `curl`. Copy uses `/set`; paste uses `/get` only if Android allows clipboard reads from the bridge process. If your Neovim or tmux config is shared across Termux, proot, macOS, Linux, and WSL, keep existing clipboard providers and enable the bridge only in Termux/proot. For Neovim:
 
 ```lua
 local is_termux = vim.env.TERMUX_VERSION ~= nil
@@ -181,6 +206,7 @@ if is_termux and vim.fn.executable("curl") == 1 then
       ["+"] = "curl -fsS --data-binary @- http://127.0.0.1:8765/set",
       ["*"] = "curl -fsS --data-binary @- http://127.0.0.1:8765/set",
     },
+    -- Paste via /get is best-effort because Android may restrict clipboard reads.
     paste = {
       ["+"] = "curl -fsS http://127.0.0.1:8765/get",
       ["*"] = "curl -fsS http://127.0.0.1:8765/get",
@@ -199,6 +225,7 @@ if-shell 'command -v curl >/dev/null 2>&1 && [ -d /data/data/com.termux ]' \
 If `/get` works on your device, you can also paste the Android clipboard into tmux through the bridge by loading it into the tmux buffer first:
 
 ```tmux
+# Paste via /get is best-effort because Android may restrict clipboard reads.
 if-shell 'command -v curl >/dev/null 2>&1 && [ -d /data/data/com.termux ]' \
   'bind p run-shell -b "curl -fsS http://127.0.0.1:8765/get | tmux load-buffer - && tmux paste-buffer"'
 if-shell 'command -v curl >/dev/null 2>&1 && [ -d /data/data/com.termux ]' \
@@ -259,58 +286,10 @@ termux-clipboard-get
 
 The Android app "Termux:API" must also be installed and allowed to run. If `termux-clipboard-get` hangs, the bridge cannot return clipboard text either. If manual `termux-clipboard-get` works only while Termux is foreground but `/get` is empty from tmux, proot, or the PWA workflow, this is likely an Android clipboard read restriction rather than a bridge failure. The bridge times out clipboard commands after 3 seconds by default; change this with `TERMUX_CLIPBOARD_BRIDGE_COMMAND_TIMEOUT=5` if needed.
 
-## PWA Install
-
-After opening the app in a supported browser, use the browser menu to install it to the Android home screen.
-
-## APT Repository Install
-
-### User Install Command
-
-On Termux, users can add your repository with:
-
-```sh
-curl -fsSL https://soichiro-fujioka.github.io/termux-ttyd-pwa/termux-ttyd-pwa-archive-keyring.gpg -o "$PREFIX/etc/apt/trusted.gpg.d/termux-ttyd-pwa-archive-keyring.gpg"
-curl -fsSL https://soichiro-fujioka.github.io/termux-ttyd-pwa/termux-ttyd-pwa.list -o "$PREFIX/etc/apt/sources.list.d/termux-ttyd-pwa.list"
-```
-
-The APT repository is signed with this key fingerprint:
-
-```text
-C94B 7C3C 81CE C096 959D  677D 2FCA 3DB5 F98C 433F
-```
-
-Then install:
-
-```sh
-pkg update
-pkg install termux-ttyd-pwa
-termux-ttyd-pwa
-```
-
-### Publishing the APT Repository
-
-The `Publish APT repository` GitHub Actions workflow builds the `.deb`, signs the APT repository metadata, and deploys `dist/apt-repo` to GitHub Pages.
-
-Configure GitHub Pages to use GitHub Actions as the source, then add this repository secret:
-
-- `APT_GPG_PRIVATE_KEY`: armored private key for the APT signing key
-
-If the signing key has a passphrase, also add:
-
-- `APT_GPG_PASSPHRASE`: passphrase for the APT signing key
-
-Export the private key with:
-
-```sh
-gpg --armor --export-secret-keys C94B7C3C81CEC096959D677D2FCA3DB5F98C433F
-```
-
-Do not commit the exported private key.
-
 ## Notes
 
 - The embedded terminal defaults to `http://127.0.0.1:7681/`.
 - Local startup on `127.0.0.1` is recommended. Exposing the app or `ttyd` to a LAN or the internet can allow other devices to operate your shell if they can reach the port.
 - Runtime font changes are shown as a selected startup style in the PWA settings because the embedded `ttyd` page runs on another port. Use startup font options to change the actual terminal font.
 - The IME button is intentionally simple. It keeps focus behavior predictable and avoids interfering with Japanese composition events.
+- If the tmux status bar is not visible, terminal padding may not have been read correctly. Try toggling fullscreen from on to off.
