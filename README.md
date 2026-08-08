@@ -81,13 +81,9 @@ Example with a custom shell command:
 
 The startup font options are passed directly to `ttyd` with `--client-option`, so the terminal uses them before it is rendered. The terminal color palette uses Termux `colors.properties` when it is available at `~/.termux/colors.properties` or `/data/data/com.termux/files/home/.termux/colors.properties`; otherwise it falls back to a Termux-like black background, white foreground, and ANSI 16-color palette. Set `TERMUX_COLORS_FILE=/path/to/colors.properties` to use another file. `--terminal-padding` adds CSS padding below the embedded terminal frame, which can help keep tmux status bars visible in fullscreen mode on mobile browsers.
 
-## Clipboard Tips
+## Clipboard Bridge
 
-The PWA allows clipboard access for the embedded `ttyd` frame, but Neovim and tmux clipboard behavior is still controlled by their own settings. For terminal-to-browser clipboard integration, OSC52 is usually the simplest option.
-
-### Recommended: Native Termux Clipboard Bridge
-
-If OSC52 passthrough does not work reliably in the `PWA -> ttyd -> tmux -> Neovim -> Android` path, use a native Termux clipboard bridge instead. This avoids browser clipboard permissions and tmux OSC52 passthrough entirely.
+Use the native Termux clipboard bridge for Neovim and tmux clipboard integration. This avoids browser clipboard permissions and tmux OSC52 passthrough entirely.
 
 The bridge keeps clipboard operations on the Android/Termux side:
 
@@ -154,6 +150,42 @@ For tmux copy mode:
 bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "curl -fsS --data-binary @- http://127.0.0.1:8765/set"
 ```
 
+If your Neovim or tmux config is shared across Termux, proot, macOS, Linux, and WSL, keep existing clipboard providers and enable the bridge only in Termux/proot. For Neovim:
+
+```lua
+local is_termux = vim.env.TERMUX_VERSION ~= nil
+  or vim.env.PREFIX == "/data/data/com.termux/files/usr"
+  or vim.fn.isdirectory("/data/data/com.termux") == 1
+
+if is_termux and vim.fn.executable("curl") == 1 then
+  vim.g.clipboard = {
+    name = "termux-clipboard-bridge",
+    copy = {
+      ["+"] = "curl -fsS --data-binary @- http://127.0.0.1:8765/set",
+      ["*"] = "curl -fsS --data-binary @- http://127.0.0.1:8765/set",
+    },
+    paste = {
+      ["+"] = "curl -fsS http://127.0.0.1:8765/get",
+      ["*"] = "curl -fsS http://127.0.0.1:8765/get",
+    },
+  }
+end
+```
+
+For tmux, put the bridge binding after other clipboard bindings so it takes priority only inside Termux/proot:
+
+```tmux
+if-shell 'command -v curl >/dev/null 2>&1 && [ -d /data/data/com.termux ]' \
+  'bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "curl -fsS --data-binary @- http://127.0.0.1:8765/set"'
+```
+
+You can also paste the Android clipboard into tmux through the bridge by loading it into a tmux buffer first:
+
+```tmux
+if-shell 'command -v curl >/dev/null 2>&1 && [ -d /data/data/com.termux ]' \
+  'bind p run-shell -b "curl -fsS http://127.0.0.1:8765/get | tmux load-buffer - && tmux paste-buffer"'
+```
+
 If the PWA terminal runs inside proot, start `termux-ttyd-pwa` from native Termux with tmux as the command:
 
 ```sh
@@ -198,76 +230,6 @@ curl -fsS http://127.0.0.1:8765/get
 ```
 
 Avoid a simple tmux binding such as `send-keys "$(curl ...)"` for paste. It can mishandle newlines, quotes, and control characters.
-
-### Alternative: OSC52
-
-OSC52 can still be useful when your browser, `ttyd`, tmux, and Neovim all pass clipboard escape sequences correctly. Its data path is longer:
-
-```text
-Neovim
-  -> OSC52 escape sequence
-  -> tmux passthrough
-  -> ttyd / xterm.js
-  -> browser or PWA clipboard permission
-  -> Android clipboard
-```
-
-For tmux, enable clipboard passthrough in `~/.tmux.conf`:
-
-```tmux
-set -g set-clipboard on
-set -g allow-passthrough on
-```
-
-For Neovim, use the built-in OSC52 clipboard provider in `init.lua`:
-
-```lua
-vim.g.clipboard = {
-  name = "OSC52",
-  copy = {
-    ["+"] = require("vim.ui.clipboard.osc52").copy("+"),
-    ["*"] = require("vim.ui.clipboard.osc52").copy("*"),
-  },
-  paste = {
-    ["+"] = require("vim.ui.clipboard.osc52").paste("+"),
-    ["*"] = require("vim.ui.clipboard.osc52").paste("*"),
-  },
-}
-```
-
-If this works in your environment, it does not need Termux:API. If it fails inside the PWA/tmux stack, use the native Termux clipboard bridge instead.
-
-### Alternative: Direct Termux:API Commands
-
-If you want to use the Android clipboard directly from native Termux, install Termux:API on Android and the `termux-api` package in Termux:
-
-```sh
-pkg install termux-api
-```
-
-Then configure Neovim to call Termux clipboard commands:
-
-```lua
-vim.g.clipboard = {
-  name = "termux",
-  copy = {
-    ["+"] = "termux-clipboard-set",
-    ["*"] = "termux-clipboard-set",
-  },
-  paste = {
-    ["+"] = "termux-clipboard-get",
-    ["*"] = "termux-clipboard-get",
-  },
-}
-```
-
-For tmux copy mode with Termux:API:
-
-```tmux
-bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "termux-clipboard-set"
-```
-
-When running inside proot, `termux-clipboard-set` and `termux-clipboard-get` may not be available unless they are exposed from the native Termux environment. In that case, prefer the native Termux clipboard bridge because proot only needs `curl` access to `127.0.0.1:8765`.
 
 ## PWA Install
 
