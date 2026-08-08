@@ -47,6 +47,8 @@ Useful options:
 - `--host 127.0.0.1`
 - `--app-port 8080`
 - `--ttyd-port 7681`
+- `--clipboard-bridge yes`
+- `--no-clipboard-bridge`
 - `--font-style termux`
 - `--copy-termux-font yes`
 - `--android-font-family monospace`
@@ -58,6 +60,8 @@ Useful options:
 - `-- COMMAND...`
 
 The default font behavior is `--copy-termux-font yes`. It uses the font file configured for Termux at `~/.termux/font.ttf`, or the path specified by `TERMUX_FONT_FILE`. The font is read at startup and injected into the temporary `ttyd` page, so the package does not redistribute font files.
+
+The clipboard bridge starts by default. If you only use native Termux clipboard commands directly and do not need the proot-oriented bridge, disable it with `--clipboard-bridge no` or `--no-clipboard-bridge`.
 
 To use an Android browser/system font instead, disable the Termux font copy and specify the CSS font family explicitly:
 
@@ -83,19 +87,21 @@ The startup font options are passed directly to `ttyd` with `--client-option`, s
 
 ## Clipboard Bridge
 
-Use the native Termux clipboard bridge for Neovim and tmux clipboard integration. This avoids browser clipboard permissions and tmux OSC52 passthrough entirely.
+Use the native Termux clipboard bridge mainly to copy text from Neovim and tmux running inside proot to the Android clipboard. This avoids browser clipboard permissions and tmux OSC52 passthrough for the copy direction.
 
 The bridge keeps clipboard operations on the Android/Termux side:
 
 ```text
 Neovim / tmux
-  -> curl http://127.0.0.1:8765/set or /get
+  -> curl http://127.0.0.1:8765/set
   -> termux-clipboard-bridge.py
-  -> termux-clipboard-set / termux-clipboard-get
+  -> termux-clipboard-set
   -> Android clipboard
 ```
 
-This means the PWA and browser do not need to read or write the clipboard. Neovim and tmux only send local HTTP requests to native Termux.
+This is most useful when Neovim or tmux runs inside proot, where `termux-clipboard-set` is not normally available directly. In native Termux only, calling `termux-clipboard-set` directly is usually simpler.
+
+The bridge also exposes `GET /get`, but Android clipboard reads may be restricted when Termux is not the foreground app. On affected devices, `termux-clipboard-get` can work when run manually in foreground Termux while the bridge still returns an empty response in the PWA/tmux/proot workflow. Treat `/get` as best-effort and device-dependent; do not rely on it for Android-to-tmux or Android-to-Neovim paste unless you have verified it on your device.
 
 Install Termux:API on Android and the `termux-api` package in native Termux:
 
@@ -111,10 +117,16 @@ pkg install curl
 
 Inside Ubuntu or another proot distribution, use that distribution's package manager instead.
 
-The bridge starts automatically with `termux-ttyd-pwa` from native Termux:
+The bridge starts automatically with `termux-ttyd-pwa` from native Termux unless disabled:
 
 ```sh
 termux-ttyd-pwa
+```
+
+Disable the bridge when native Termux clipboard commands are enough:
+
+```sh
+termux-ttyd-pwa --no-clipboard-bridge
 ```
 
 For a source checkout, use:
@@ -126,29 +138,31 @@ For a source checkout, use:
 The bridge listens on `127.0.0.1:8765` by default. It exposes three local endpoints:
 
 - `POST /set`: writes request body to the Android clipboard
-- `GET /get`: reads the Android clipboard
+- `GET /get`: reads the Android clipboard when Android allows the bridge process to read it
 - `GET /health`: checks whether the bridge is reachable without reading the clipboard
 
-Then configure Neovim inside tmux, proot, or native Termux to call the bridge with `curl`:
+Then configure Neovim inside tmux or proot to call the bridge with `curl`. Copy uses `/set`; paste uses `/get` only if Android allows clipboard reads from the bridge process:
 
 ```lua
 vim.g.clipboard = {
   name = "termux-clipboard-bridge",
   copy = {
-    ["+"] = "curl -fsS --max-time 3 --data-binary @- http://127.0.0.1:8765/set",
-    ["*"] = "curl -fsS --max-time 3 --data-binary @- http://127.0.0.1:8765/set",
+    ["+"] = "curl -fsS --data-binary @- http://127.0.0.1:8765/set",
+    ["*"] = "curl -fsS --data-binary @- http://127.0.0.1:8765/set",
   },
   paste = {
-    ["+"] = "curl -fsS --max-time 3 http://127.0.0.1:8765/get",
-    ["*"] = "curl -fsS --max-time 3 http://127.0.0.1:8765/get",
-  },
+    ["+"] = "curl -fsS http://127.0.0.1:8765/get",
+    ["*"] = "curl -fsS http://127.0.0.1:8765/get",
+  }
 }
 ```
+
+If `/get` is empty on your device, keep the bridge for copy-to-Android use and use another paste path for Android-to-Neovim.
 
 For tmux copy mode:
 
 ```tmux
-bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "curl -fsS --max-time 3 --data-binary @- http://127.0.0.1:8765/set"
+bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "curl -fsS --data-binary @- http://127.0.0.1:8765/set"
 ```
 
 If your Neovim or tmux config is shared across Termux, proot, macOS, Linux, and WSL, keep existing clipboard providers and enable the bridge only in Termux/proot. For Neovim:
@@ -162,29 +176,31 @@ if is_termux and vim.fn.executable("curl") == 1 then
   vim.g.clipboard = {
     name = "termux-clipboard-bridge",
     copy = {
-      ["+"] = "curl -fsS --max-time 3 --data-binary @- http://127.0.0.1:8765/set",
-      ["*"] = "curl -fsS --max-time 3 --data-binary @- http://127.0.0.1:8765/set",
+      ["+"] = "curl -fsS --data-binary @- http://127.0.0.1:8765/set",
+      ["*"] = "curl -fsS --data-binary @- http://127.0.0.1:8765/set",
     },
     paste = {
-      ["+"] = "curl -fsS --max-time 3 http://127.0.0.1:8765/get",
-      ["*"] = "curl -fsS --max-time 3 http://127.0.0.1:8765/get",
-    },
+      ["+"] = "curl -fsS http://127.0.0.1:8765/get",
+      ["*"] = "curl -fsS http://127.0.0.1:8765/get",
+    }
   }
 end
 ```
 
-For tmux, put the bridge binding after other clipboard bindings so it takes priority only when the bridge is reachable. This works from native Termux and from proot as long as `127.0.0.1:8765` reaches the native Termux bridge:
+For tmux, put the bridge binding after other clipboard bindings so it takes priority inside Termux/proot when multiple clipboard commands exist. This works from native Termux and from proot as long as `127.0.0.1:8765` reaches the native Termux bridge:
 
 ```tmux
-if-shell 'command -v curl >/dev/null 2>&1 && curl -fsS --max-time 1 http://127.0.0.1:8765/health >/dev/null' \
-  'bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "curl -fsS --max-time 3 --data-binary @- http://127.0.0.1:8765/set"'
+if-shell 'command -v curl >/dev/null 2>&1 && [ -d /data/data/com.termux ]' \
+  'bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "curl -fsS --data-binary @- http://127.0.0.1:8765/set"'
 ```
 
-You can also paste the Android clipboard into tmux through the bridge by loading it into a named tmux buffer first. Use a separate key such as `prefix + P` so the normal tmux `prefix + p` buffer paste keeps working:
+If `/get` works on your device, you can also paste the Android clipboard into tmux through the bridge by loading it into the tmux buffer first:
 
 ```tmux
-if-shell 'command -v curl >/dev/null 2>&1 && curl -fsS --max-time 1 http://127.0.0.1:8765/health >/dev/null' \
-  'bind P run-shell -b "curl -fsS --max-time 3 http://127.0.0.1:8765/get | tmux load-buffer -b android-clipboard - \\; paste-buffer -d -b android-clipboard -t #{pane_id}"'
+if-shell 'command -v curl >/dev/null 2>&1 && [ -d /data/data/com.termux ]' \
+  'bind p run-shell -b "curl -fsS http://127.0.0.1:8765/get | tmux load-buffer - && tmux paste-buffer"'
+if-shell 'command -v curl >/dev/null 2>&1 && [ -d /data/data/com.termux ]' \
+  'bind v run-shell -b "curl -fsS http://127.0.0.1:8765/get | tmux load-buffer - && tmux paste-buffer"'
 ```
 
 If the PWA terminal runs inside proot, start `termux-ttyd-pwa` from native Termux with tmux as the command:
@@ -195,7 +211,7 @@ termux-ttyd-pwa -- tmux new -A -s pwa
 
 Keep the bridge bound to `127.0.0.1`. Do not expose it with `0.0.0.0`, because any reachable client could read or overwrite the Android clipboard.
 
-Copy flow from Neovim to Android:
+Main copy flow from proot Neovim to Android:
 
 ```text
 Neovim yank, such as "+y
@@ -205,12 +221,12 @@ Neovim yank, such as "+y
   -> Android clipboard is updated
 ```
 
-Paste flow from Android to Neovim:
+Best-effort paste flow from Android to Neovim:
 
 ```text
 Neovim paste, such as "+p
   -> Neovim clipboard provider runs curl /get
-  -> bridge runs termux-clipboard-get
+  -> bridge runs termux-clipboard-get, if Android allows it
   -> Android clipboard text is returned to Neovim
   -> Neovim inserts the text
 ```
@@ -224,22 +240,22 @@ tmux copy-mode selection and y
   -> Android clipboard is updated
 ```
 
-The tmux copy-mode example above only handles copying from tmux to Android. The `prefix + P` binding handles Android-to-tmux paste. For pasting Android clipboard text into Neovim, use Neovim paste such as `"+p`. For shell-level access, you can read the Android clipboard with:
+The tmux copy-mode example above only handles copying from tmux to Android. If `/get` works on your device, the `prefix + p` and `prefix + v` bindings above handle Android-to-tmux paste. For pasting Android clipboard text into Neovim, use Neovim paste such as `"+p` only after verifying `/get`. For shell-level access, test Android clipboard reads with:
 
 ```sh
-curl -fsS --max-time 3 http://127.0.0.1:8765/get
+curl -fsS http://127.0.0.1:8765/get
 ```
 
 Avoid a simple tmux binding such as `send-keys "$(curl ...)"` for paste. It can mishandle newlines, quotes, and control characters.
 
-If `curl http://127.0.0.1:8765/get` hangs or times out, check Termux:API first:
+If `curl http://127.0.0.1:8765/get` hangs, times out, or returns an empty response, check Termux:API first:
 
 ```sh
 pkg install termux-api
 termux-clipboard-get
 ```
 
-The Android app "Termux:API" must also be installed and allowed to run. If `termux-clipboard-get` hangs, the bridge cannot return clipboard text either. The bridge times out clipboard commands after 3 seconds by default; change this with `TERMUX_CLIPBOARD_BRIDGE_COMMAND_TIMEOUT=5` if needed.
+The Android app "Termux:API" must also be installed and allowed to run. If `termux-clipboard-get` hangs, the bridge cannot return clipboard text either. If manual `termux-clipboard-get` works only while Termux is foreground but `/get` is empty from tmux, proot, or the PWA workflow, this is likely an Android clipboard read restriction rather than a bridge failure. The bridge times out clipboard commands after 3 seconds by default; change this with `TERMUX_CLIPBOARD_BRIDGE_COMMAND_TIMEOUT=5` if needed.
 
 ## PWA Install
 

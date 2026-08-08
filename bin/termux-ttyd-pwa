@@ -27,10 +27,11 @@ TERMINAL_PADDING="0"
 TERMINAL_THEME='{"foreground":"#ffffff","background":"#000000","cursor":"#ffffff","cursorAccent":"#000000","selectionBackground":"#4d4d4d","black":"#000000","red":"#cc0000","green":"#00cc00","yellow":"#cccc00","blue":"#0000cc","magenta":"#cc00cc","cyan":"#00cccc","white":"#cccccc","brightBlack":"#666666","brightRed":"#ff0000","brightGreen":"#00ff00","brightYellow":"#ffff00","brightBlue":"#0000ff","brightMagenta":"#ff00ff","brightCyan":"#00ffff","brightWhite":"#ffffff"}'
 CLIPBOARD_BRIDGE_HOST="${TERMUX_CLIPBOARD_BRIDGE_HOST:-127.0.0.1}"
 CLIPBOARD_BRIDGE_PORT="${TERMUX_CLIPBOARD_BRIDGE_PORT:-8765}"
+CLIPBOARD_BRIDGE="${TERMUX_TTYD_PWA_CLIPBOARD_BRIDGE:-yes}"
 COMMAND=("${SHELL:-bash}")
 
 usage() {
-  printf 'Usage: %s [--host HOST] [--app-port PORT] [--ttyd-port PORT] [--font-style termux] [--copy-termux-font yes|no] [--android-font-family FAMILY] [--font-size SIZE] [--font-weight WEIGHT] [--letter-spacing SPACING] [--line-height HEIGHT] [--terminal-padding CSS_LENGTH] [-- COMMAND...]\n' "$0"
+  printf 'Usage: %s [--host HOST] [--app-port PORT] [--ttyd-port PORT] [--clipboard-bridge yes|no] [--no-clipboard-bridge] [--font-style termux] [--copy-termux-font yes|no] [--android-font-family FAMILY] [--font-size SIZE] [--font-weight WEIGHT] [--letter-spacing SPACING] [--line-height HEIGHT] [--terminal-padding CSS_LENGTH] [-- COMMAND...]\n' "$0"
 }
 
 font_family_for_style() {
@@ -260,6 +261,7 @@ PY
 }
 
 eval "$(termux_font_defaults)"
+CLIPBOARD_BRIDGE="$(normalize_yes_no TERMUX_TTYD_PWA_CLIPBOARD_BRIDGE "$CLIPBOARD_BRIDGE")"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -277,6 +279,15 @@ while [ "$#" -gt 0 ]; do
       require_value "$@"
       TTYD_PORT="$2"
       shift 2
+      ;;
+    --clipboard-bridge)
+      require_value "$@"
+      CLIPBOARD_BRIDGE="$(normalize_yes_no "$1" "$2")"
+      shift 2
+      ;;
+    --no-clipboard-bridge)
+      CLIPBOARD_BRIDGE="no"
+      shift
       ;;
     --font-style)
       require_value "$@"
@@ -415,7 +426,9 @@ with open(path, "w", encoding="utf-8") as file:
     file.write(";\n")
 PY
 
-start_clipboard_bridge
+if [ "$CLIPBOARD_BRIDGE" = "yes" ]; then
+  start_clipboard_bridge
+fi
 
 ttyd \
   --writable \
@@ -433,7 +446,11 @@ TTYD_PID="$!"
 
 printf 'ttyd: http://%s:%s/\n' "$HOST" "$TTYD_PORT"
 printf 'PWA:  http://%s:%s/\n' "$HOST" "$APP_PORT"
-printf 'Clipboard bridge: http://%s:%s/\n' "$CLIPBOARD_BRIDGE_HOST" "$CLIPBOARD_BRIDGE_PORT"
+if [ "$CLIPBOARD_BRIDGE" = "yes" ]; then
+  printf 'Clipboard bridge: http://%s:%s/\n' "$CLIPBOARD_BRIDGE_HOST" "$CLIPBOARD_BRIDGE_PORT"
+else
+  printf 'Clipboard bridge: disabled\n'
+fi
 printf 'Termux font copy: %s\n' "$COPY_TERMUX_FONT"
 printf 'Font: style=%s family=%s size=%s weight=%s letter-spacing=%s line-height=%s\n' "$FONT_STYLE" "$FONT_FAMILY" "$FONT_SIZE" "$FONT_WEIGHT" "$LETTER_SPACING" "$LINE_HEIGHT"
 printf 'Terminal padding: %s\n' "$TERMINAL_PADDING"
