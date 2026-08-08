@@ -87,6 +87,8 @@ The startup font options are passed directly to `ttyd` with `--client-option`, s
 
 ## Clipboard Bridge
 
+The embedded terminal maps `Ctrl+v` to clipboard paste. It first uses browser clipboard access for the local `ttyd` frame, then falls back to the native Termux clipboard bridge at `/get` when browser access is blocked. On Android this may show a clipboard permission prompt, and it still depends on the browser and OS clipboard policy. If `Ctrl+v` cannot read the clipboard on your device, use the bridge-based paste options below where `/get` works.
+
 Use the native Termux clipboard bridge mainly to copy text from Neovim and tmux running inside proot to the Android clipboard. This avoids browser clipboard permissions and tmux OSC52 passthrough for the copy direction.
 
 The bridge keeps clipboard operations on the Android/Termux side:

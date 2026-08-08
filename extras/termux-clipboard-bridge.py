@@ -28,9 +28,20 @@ def run_termux_clipboard(command, **kwargs):
 
 
 class ClipboardBridge(BaseHTTPRequestHandler):
+    def send_cors_headers(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_cors_headers()
+        self.end_headers()
+
     def do_GET(self):
         if self.path == "/health":
             self.send_response(204)
+            self.send_cors_headers()
             self.end_headers()
             return
 
@@ -41,12 +52,14 @@ class ClipboardBridge(BaseHTTPRequestHandler):
         result = run_termux_clipboard(["termux-clipboard-get"])
         if result.returncode != 0:
             self.send_response(504 if result.returncode == 124 else 502)
+            self.send_cors_headers()
             self.end_headers()
             self.wfile.write(result.stderr)
             return
 
         self.send_response(200)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_cors_headers()
         self.end_headers()
         self.wfile.write(result.stdout)
 
@@ -67,11 +80,13 @@ class ClipboardBridge(BaseHTTPRequestHandler):
         )
         if result.returncode != 0:
             self.send_response(504 if result.returncode == 124 else 502)
+            self.send_cors_headers()
             self.end_headers()
             self.wfile.write(result.stderr)
             return
 
         self.send_response(204)
+        self.send_cors_headers()
         self.end_headers()
 
     def log_message(self, format, *args):

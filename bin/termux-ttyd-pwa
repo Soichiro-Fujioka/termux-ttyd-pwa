@@ -109,6 +109,7 @@ PY
 create_ttyd_index() {
   local output_path="$1"
   local font_path="$2"
+  local clipboard_bridge_url="$3"
   local probe_port
   local probe_pid
 
@@ -125,13 +126,12 @@ PY
   probe_pid="$!"
 
   local status=0
-  python3 - "$probe_port" "$output_path" "$font_path" <<'PY' || status="$?"
-import base64
+  python3 - "$probe_port" "$output_path" "$font_path" "$clipboard_bridge_url" <<'PY' || status="$?"
 import sys
 import time
 import urllib.request
 
-port, output_path, font_path = sys.argv[1:]
+port, output_path, font_path, clipboard_bridge_url = sys.argv[1:]
 url = f"http://127.0.0.1:{port}/"
 last_error = None
 
@@ -146,22 +146,98 @@ for _ in range(30):
 else:
     raise SystemExit(f"Failed to read ttyd default index: {last_error}")
 
-with open(font_path, "rb") as file:
-    font_data = base64.b64encode(file.read()).decode("ascii")
+head_injections = []
 
-style = (
-    '<style id="termux-ttyd-pwa-font">'
-    '@font-face{font-family:"TermuxTtydPwaFont";'
-    f'src:url(data:font/ttf;base64,{font_data}) format("truetype");'
-    'font-display:block;}'
-    '</style>'
-)
+if font_path:
+    import base64
+
+    with open(font_path, "rb") as file:
+        font_data = base64.b64encode(file.read()).decode("ascii")
+
+    head_injections.append(
+        '<style id="termux-ttyd-pwa-font">'
+        '@font-face{font-family:"TermuxTtydPwaFont";'
+        f'src:url(data:font/ttf;base64,{font_data}) format("truetype");'
+        'font-display:block;}'
+        '</style>'
+    )
+
+head_injections.append(r'''<script id="termux-ttyd-pwa-shortcuts">
+(function () {
+  var clipboardBridgeUrl = __CLIPBOARD_BRIDGE_URL__;
+
+  function isTerminalTextarea(target) {
+    return target && target.classList && target.classList.contains("xterm-helper-textarea");
+  }
+
+  function isEditable(target) {
+    if (!target || isTerminalTextarea(target)) return false;
+    var name = target.tagName ? target.tagName.toLowerCase() : "";
+    return target.isContentEditable || name === "input" || name === "textarea" || name === "select";
+  }
+
+  function clipboardEvent(text) {
+    var clipboardData;
+    try {
+      clipboardData = new DataTransfer();
+      clipboardData.setData("text/plain", text);
+    } catch (error) {
+      clipboardData = { getData: function (type) { return type === "text/plain" ? text : ""; } };
+    }
+
+    try {
+      return new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: clipboardData
+      });
+    } catch (error) {
+      var event = new Event("paste", { bubbles: true, cancelable: true });
+      Object.defineProperty(event, "clipboardData", { value: clipboardData });
+      return event;
+    }
+  }
+
+  function readBridgeClipboard() {
+    if (!clipboardBridgeUrl) return Promise.resolve("");
+    return fetch(clipboardBridgeUrl + "/get", { cache: "no-store" }).then(function (response) {
+      return response.ok ? response.text() : "";
+    }).catch(function () {
+      return "";
+    });
+  }
+
+  function readClipboardText() {
+    if (!navigator.clipboard || !navigator.clipboard.readText) return readBridgeClipboard();
+    return navigator.clipboard.readText().catch(readBridgeClipboard);
+  }
+
+  function pasteText(text) {
+    if (!text) return;
+    var textarea = document.querySelector(".xterm-helper-textarea");
+    if (!textarea) return;
+    textarea.focus();
+    textarea.dispatchEvent(clipboardEvent(text));
+  }
+
+  document.addEventListener("keydown", function (event) {
+    if (!event.ctrlKey || event.shiftKey || event.altKey || event.metaKey) return;
+    if (String(event.key || "").toLowerCase() !== "v" && event.code !== "KeyV") return;
+    if (isEditable(event.target)) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    readClipboardText().then(pasteText);
+  }, true);
+})();
+</script>'''.replace("__CLIPBOARD_BRIDGE_URL__", repr(clipboard_bridge_url)))
 
 if "</head>" not in html:
     raise SystemExit("ttyd default index does not contain </head>")
 
 with open(output_path, "w", encoding="utf-8") as file:
-    file.write(html.replace("</head>", style + "</head>", 1))
+    file.write(html.replace("</head>", "".join(head_injections) + "</head>", 1))
 PY
 
   kill "$probe_pid" 2>/dev/null || true
@@ -399,15 +475,16 @@ trap cleanup EXIT INT TERM
 
 PUBLIC_DIR="$(mktemp -d "${TMPDIR:-/tmp}/termux-ttyd-pwa.XXXXXX")"
 cp -R "$APP_DIR/public/." "$PUBLIC_DIR/"
-TTYD_INDEX_OPTION=()
+TTYD_INDEX_FILE="$PUBLIC_DIR/ttyd-index.html"
+TTYD_INDEX_OPTION=(--index "$TTYD_INDEX_FILE")
 
 if [ "$COPY_TERMUX_FONT" = "yes" ] && [ -n "$TERMUX_CONFIGURED_FONT_FILE" ]; then
-  TTYD_INDEX_FILE="$PUBLIC_DIR/ttyd-index.html"
-  create_ttyd_index "$TTYD_INDEX_FILE" "$TERMUX_CONFIGURED_FONT_FILE"
-  TTYD_INDEX_OPTION=(--index "$TTYD_INDEX_FILE")
+  create_ttyd_index "$TTYD_INDEX_FILE" "$TERMUX_CONFIGURED_FONT_FILE" "http://$CLIPBOARD_BRIDGE_HOST:$CLIPBOARD_BRIDGE_PORT"
 elif [ "$COPY_TERMUX_FONT" = "yes" ]; then
   printf 'Termux font file was not found. Set ~/.termux/font.ttf or TERMUX_FONT_FILE.\n' >&2
   exit 1
+else
+  create_ttyd_index "$TTYD_INDEX_FILE" "" "http://$CLIPBOARD_BRIDGE_HOST:$CLIPBOARD_BRIDGE_PORT"
 fi
 
 python3 - "$PUBLIC_DIR/config.js" "$FONT_STYLE" "$FONT_FAMILY" "$TERMINAL_PADDING" <<'PY'
