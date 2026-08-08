@@ -272,6 +272,37 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
 PY
 }
 
+ensure_server_ports_available() {
+  local app_port_open="no"
+  local ttyd_port_open="no"
+
+  if tcp_port_open "$HOST" "$APP_PORT"; then
+    app_port_open="yes"
+  fi
+  if tcp_port_open "$HOST" "$TTYD_PORT"; then
+    ttyd_port_open="yes"
+  fi
+
+  if [ "$app_port_open" = "yes" ] && [ "$ttyd_port_open" = "yes" ]; then
+    printf 'termux-ttyd-pwa is already running:\n'
+    printf 'ttyd: http://%s:%s/\n' "$HOST" "$TTYD_PORT"
+    printf 'PWA:  http://%s:%s/\n' "$HOST" "$APP_PORT"
+    exit 0
+  fi
+
+  if [ "$ttyd_port_open" = "yes" ]; then
+    printf 'ttyd port is already in use: http://%s:%s/\n' "$HOST" "$TTYD_PORT" >&2
+    printf 'Stop the existing process or start with --ttyd-port PORT.\n' >&2
+    exit 1
+  fi
+
+  if [ "$app_port_open" = "yes" ]; then
+    printf 'PWA port is already in use: http://%s:%s/\n' "$HOST" "$APP_PORT" >&2
+    printf 'Stop the existing process or start with --app-port PORT.\n' >&2
+    exit 1
+  fi
+}
+
 start_clipboard_bridge() {
   local bridge_path="$APP_DIR/extras/termux-clipboard-bridge.py"
 
@@ -462,6 +493,8 @@ case "$HOST" in
     printf 'Anyone on the reachable network may be able to control this shell. Use only on trusted networks.\n' >&2
     ;;
 esac
+
+ensure_server_ports_available
 
 TERMINAL_THEME="$(termux_theme)"
 TERMUX_CONFIGURED_FONT_FILE="$(termux_font_file || true)"

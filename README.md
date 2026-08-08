@@ -301,3 +301,42 @@ The Android app "Termux:API" must also be installed and allowed to run. If `term
 - Runtime font changes are shown as a selected startup style in the PWA settings because the embedded `ttyd` page runs on another port. Use startup font options to change the actual terminal font.
 - The IME button is intentionally simple. It keeps focus behavior predictable and avoids interfering with Japanese composition events.
 - If the tmux status bar is not visible, terminal padding may not have been read correctly. Try toggling fullscreen from on to off.
+
+## Troubleshooting
+
+### Address already in use
+
+If startup fails with `Address already in use`, another process is already using one of the local ports. This commonly happens when a previous `termux-ttyd-pwa` instance is still running:
+
+```text
+lws_socket_bind: ERROR on binding fd ... to port 7681 (EADDRINUSE)
+OSError: [Errno 98] Address already in use
+```
+
+Closing the Termux screen or session does not always stop background processes. `ttyd`, `python3 -m http.server`, the clipboard bridge, `tmux`, or `proot` may remain alive until they are stopped explicitly or Termux is force-stopped by Android.
+
+Check for remaining processes:
+
+```sh
+ps -ef | grep -E 'ttyd|http.server|termux-clipboard-bridge'
+```
+
+Stop only the processes you intend to stop:
+
+```sh
+pkill -f 'ttyd'
+pkill -f 'python3 -m http.server'
+pkill -f 'termux-clipboard-bridge'
+```
+
+If you use tmux, check active sessions before stopping related processes:
+
+```sh
+tmux ls
+```
+
+You can also avoid the conflict by choosing different ports:
+
+```sh
+termux-ttyd-pwa --app-port 8081 --ttyd-port 7682
+```
