@@ -7,6 +7,24 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 HOST = os.environ.get("TERMUX_CLIPBOARD_BRIDGE_HOST", "127.0.0.1")
 PORT = int(os.environ.get("TERMUX_CLIPBOARD_BRIDGE_PORT", "8765"))
 MAX_BYTES = int(os.environ.get("TERMUX_CLIPBOARD_BRIDGE_MAX_BYTES", "1048576"))
+COMMAND_TIMEOUT = float(os.environ.get("TERMUX_CLIPBOARD_BRIDGE_COMMAND_TIMEOUT", "3"))
+
+
+def run_termux_clipboard(command, **kwargs):
+    try:
+        return subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=COMMAND_TIMEOUT,
+            **kwargs,
+        )
+    except FileNotFoundError as error:
+        return subprocess.CompletedProcess(command, 127, b"", f"{error}\n".encode())
+    except subprocess.TimeoutExpired:
+        message = f"{' '.join(command)} timed out after {COMMAND_TIMEOUT:g}s\n"
+        return subprocess.CompletedProcess(command, 124, b"", message.encode())
 
 
 class ClipboardBridge(BaseHTTPRequestHandler):
@@ -15,14 +33,9 @@ class ClipboardBridge(BaseHTTPRequestHandler):
             self.send_error(404)
             return
 
-        result = subprocess.run(
-            ["termux-clipboard-get"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-        )
+        result = run_termux_clipboard(["termux-clipboard-get"])
         if result.returncode != 0:
-            self.send_response(502)
+            self.send_response(504 if result.returncode == 124 else 502)
             self.end_headers()
             self.wfile.write(result.stderr)
             return
@@ -43,15 +56,12 @@ class ClipboardBridge(BaseHTTPRequestHandler):
             return
 
         data = self.rfile.read(length)
-        result = subprocess.run(
+        result = run_termux_clipboard(
             ["termux-clipboard-set"],
             input=data,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
         )
         if result.returncode != 0:
-            self.send_response(502)
+            self.send_response(504 if result.returncode == 124 else 502)
             self.end_headers()
             self.wfile.write(result.stderr)
             return

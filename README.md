@@ -134,12 +134,12 @@ Then configure Neovim inside tmux, proot, or native Termux to call the bridge wi
 vim.g.clipboard = {
   name = "termux-clipboard-bridge",
   copy = {
-    ["+"] = "curl -fsS --data-binary @- http://127.0.0.1:8765/set",
-    ["*"] = "curl -fsS --data-binary @- http://127.0.0.1:8765/set",
+    ["+"] = "curl -fsS --max-time 3 --data-binary @- http://127.0.0.1:8765/set",
+    ["*"] = "curl -fsS --max-time 3 --data-binary @- http://127.0.0.1:8765/set",
   },
   paste = {
-    ["+"] = "curl -fsS http://127.0.0.1:8765/get",
-    ["*"] = "curl -fsS http://127.0.0.1:8765/get",
+    ["+"] = "curl -fsS --max-time 3 http://127.0.0.1:8765/get",
+    ["*"] = "curl -fsS --max-time 3 http://127.0.0.1:8765/get",
   },
 }
 ```
@@ -147,7 +147,7 @@ vim.g.clipboard = {
 For tmux copy mode:
 
 ```tmux
-bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "curl -fsS --data-binary @- http://127.0.0.1:8765/set"
+bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "curl -fsS --max-time 3 --data-binary @- http://127.0.0.1:8765/set"
 ```
 
 If your Neovim or tmux config is shared across Termux, proot, macOS, Linux, and WSL, keep existing clipboard providers and enable the bridge only in Termux/proot. For Neovim:
@@ -161,12 +161,12 @@ if is_termux and vim.fn.executable("curl") == 1 then
   vim.g.clipboard = {
     name = "termux-clipboard-bridge",
     copy = {
-      ["+"] = "curl -fsS --data-binary @- http://127.0.0.1:8765/set",
-      ["*"] = "curl -fsS --data-binary @- http://127.0.0.1:8765/set",
+      ["+"] = "curl -fsS --max-time 3 --data-binary @- http://127.0.0.1:8765/set",
+      ["*"] = "curl -fsS --max-time 3 --data-binary @- http://127.0.0.1:8765/set",
     },
     paste = {
-      ["+"] = "curl -fsS http://127.0.0.1:8765/get",
-      ["*"] = "curl -fsS http://127.0.0.1:8765/get",
+      ["+"] = "curl -fsS --max-time 3 http://127.0.0.1:8765/get",
+      ["*"] = "curl -fsS --max-time 3 http://127.0.0.1:8765/get",
     },
   }
 end
@@ -176,14 +176,14 @@ For tmux, put the bridge binding after other clipboard bindings so it takes prio
 
 ```tmux
 if-shell 'command -v curl >/dev/null 2>&1 && [ -d /data/data/com.termux ]' \
-  'bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "curl -fsS --data-binary @- http://127.0.0.1:8765/set"'
+  'bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "curl -fsS --max-time 3 --data-binary @- http://127.0.0.1:8765/set"'
 ```
 
 You can also paste the Android clipboard into tmux through the bridge by loading it into a tmux buffer first:
 
 ```tmux
 if-shell 'command -v curl >/dev/null 2>&1 && [ -d /data/data/com.termux ]' \
-  'bind p run-shell -b "curl -fsS http://127.0.0.1:8765/get | tmux load-buffer - && tmux paste-buffer"'
+  'bind p run-shell -b "curl -fsS --max-time 3 http://127.0.0.1:8765/get | tmux load-buffer - && tmux paste-buffer"'
 ```
 
 If the PWA terminal runs inside proot, start `termux-ttyd-pwa` from native Termux with tmux as the command:
@@ -226,10 +226,19 @@ tmux copy-mode selection and y
 The tmux example above only handles copying from tmux to Android. For pasting Android clipboard text into Neovim, use Neovim paste such as `"+p`. For shell-level access, you can read the Android clipboard with:
 
 ```sh
-curl -fsS http://127.0.0.1:8765/get
+curl -fsS --max-time 3 http://127.0.0.1:8765/get
 ```
 
 Avoid a simple tmux binding such as `send-keys "$(curl ...)"` for paste. It can mishandle newlines, quotes, and control characters.
+
+If `curl http://127.0.0.1:8765/get` hangs or times out, check Termux:API first:
+
+```sh
+pkg install termux-api
+termux-clipboard-get
+```
+
+The Android app "Termux:API" must also be installed and allowed to run. If `termux-clipboard-get` hangs, the bridge cannot return clipboard text either. The bridge times out clipboard commands after 3 seconds by default; change this with `TERMUX_CLIPBOARD_BRIDGE_COMMAND_TIMEOUT=5` if needed.
 
 ## PWA Install
 
