@@ -28,10 +28,11 @@ TERMINAL_THEME='{"foreground":"#ffffff","background":"#000000","cursor":"#ffffff
 CLIPBOARD_BRIDGE_HOST="${TERMUX_CLIPBOARD_BRIDGE_HOST:-127.0.0.1}"
 CLIPBOARD_BRIDGE_PORT="${TERMUX_CLIPBOARD_BRIDGE_PORT:-8765}"
 CLIPBOARD_BRIDGE="${TERMUX_TTYD_PWA_CLIPBOARD_BRIDGE:-yes}"
+TMUX_SESSION=""
 COMMAND=("${SHELL:-bash}")
 
 usage() {
-  printf 'Usage: %s [--host HOST] [--app-port PORT] [--ttyd-port PORT] [--clipboard-bridge yes|no] [--no-clipboard-bridge] [--font-style termux] [--copy-termux-font yes|no] [--android-font-family FAMILY] [--font-size SIZE] [--font-weight WEIGHT] [--letter-spacing SPACING] [--line-height HEIGHT] [--terminal-padding CSS_LENGTH] [-- COMMAND...]\n' "$0"
+  printf 'Usage: %s [--host HOST] [--app-port PORT] [--ttyd-port PORT] [--clipboard-bridge yes|no] [--no-clipboard-bridge] [--tmux-session NAME] [--font-style termux] [--copy-termux-font yes|no] [--android-font-family FAMILY] [--font-size SIZE] [--font-weight WEIGHT] [--letter-spacing SPACING] [--line-height HEIGHT] [--terminal-padding CSS_LENGTH] [-- COMMAND...]\n' "$0"
 }
 
 font_family_for_style() {
@@ -365,6 +366,11 @@ while [ "$#" -gt 0 ]; do
       CLIPBOARD_BRIDGE="no"
       shift
       ;;
+    --tmux-session)
+      require_value "$@"
+      TMUX_SESSION="$2"
+      shift 2
+      ;;
     --font-style)
       require_value "$@"
       FONT_STYLE="$2"
@@ -443,6 +449,11 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
+if [ -n "$TMUX_SESSION" ] && ! command -v tmux >/dev/null 2>&1; then
+  printf 'tmux is required when --tmux-session is used.\n' >&2
+  exit 1
+fi
+
 case "$HOST" in
   127.0.0.1|localhost|::1)
     ;;
@@ -505,6 +516,11 @@ PY
 
 if [ "$CLIPBOARD_BRIDGE" = "yes" ]; then
   start_clipboard_bridge
+fi
+
+if [ -n "$TMUX_SESSION" ]; then
+  printf -v TMUX_COMMAND '%q ' "${COMMAND[@]}"
+  COMMAND=(tmux new-session -A -s "$TMUX_SESSION" "$TMUX_COMMAND")
 fi
 
 ttyd \

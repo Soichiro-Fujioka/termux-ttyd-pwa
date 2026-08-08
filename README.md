@@ -232,10 +232,18 @@ if-shell 'command -v curl >/dev/null 2>&1 && [ -d /data/data/com.termux ]' \
   'bind v run-shell -b "curl -fsS http://127.0.0.1:8765/get | tmux load-buffer - && tmux paste-buffer"'
 ```
 
-If the PWA terminal runs inside proot, start `termux-ttyd-pwa` from native Termux with tmux as the command:
+If the PWA is started from native Termux but your main shell is `proot` plus `tmux`, keep the `ttyd` command anchored in a native Termux tmux session. This prevents browser reconnects from starting `proot` again and losing the visible session:
 
 ```sh
-termux-ttyd-pwa -- tmux new -A -s pwa
+termux-ttyd-pwa --tmux-session main -- proot-distro login ubuntu -- tmux new -A -s main
+```
+
+`ttyd` starts its command for each browser terminal connection. `--tmux-session main` makes reconnects attach to the native Termux tmux session instead, so the `proot` process is only created when that native tmux session does not already exist.
+
+If you do not need `proot`, you can use the same option with a normal shell or tmux command:
+
+```sh
+termux-ttyd-pwa --tmux-session main
 ```
 
 Keep the bridge bound to `127.0.0.1`. Do not expose it with `0.0.0.0`, because any reachable client could read or overwrite the Android clipboard.
