@@ -25,6 +25,8 @@ LETTER_SPACING="0"
 LINE_HEIGHT="1.2"
 TERMINAL_PADDING="0"
 TERMINAL_THEME='{"foreground":"#ffffff","background":"#000000","cursor":"#ffffff","cursorAccent":"#000000","selectionBackground":"#4d4d4d","black":"#000000","red":"#cc0000","green":"#00cc00","yellow":"#cccc00","blue":"#0000cc","magenta":"#cc00cc","cyan":"#00cccc","white":"#cccccc","brightBlack":"#666666","brightRed":"#ff0000","brightGreen":"#00ff00","brightYellow":"#ffff00","brightBlue":"#0000ff","brightMagenta":"#ff00ff","brightCyan":"#00ffff","brightWhite":"#ffffff"}'
+CLIPBOARD_BRIDGE_HOST="${TERMUX_CLIPBOARD_BRIDGE_HOST:-127.0.0.1}"
+CLIPBOARD_BRIDGE_PORT="${TERMUX_CLIPBOARD_BRIDGE_PORT:-8765}"
 COMMAND=("${SHELL:-bash}")
 
 usage() {
@@ -178,6 +180,44 @@ termux_font_file() {
     fi
   done
   return 1
+}
+
+tcp_port_open() {
+  python3 - "$1" "$2" <<'PY'
+import socket
+import sys
+
+host, port = sys.argv[1], int(sys.argv[2])
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+    sock.settimeout(0.3)
+    raise SystemExit(0 if sock.connect_ex((host, port)) == 0 else 1)
+PY
+}
+
+start_clipboard_bridge() {
+  local bridge_path="$APP_DIR/extras/termux-clipboard-bridge.py"
+
+  if [ ! -f "$bridge_path" ]; then
+    printf 'Clipboard bridge was not found at %s.\n' "$bridge_path" >&2
+    exit 1
+  fi
+
+  if tcp_port_open "$CLIPBOARD_BRIDGE_HOST" "$CLIPBOARD_BRIDGE_PORT"; then
+    printf 'Clipboard bridge: http://%s:%s/ (already running)\n' "$CLIPBOARD_BRIDGE_HOST" "$CLIPBOARD_BRIDGE_PORT"
+    return 0
+  fi
+
+  TERMUX_CLIPBOARD_BRIDGE_HOST="$CLIPBOARD_BRIDGE_HOST" \
+    TERMUX_CLIPBOARD_BRIDGE_PORT="$CLIPBOARD_BRIDGE_PORT" \
+    python3 "$bridge_path" &
+  CLIPBOARD_BRIDGE_PID="$!"
+
+  sleep 0.2
+  if ! kill -0 "$CLIPBOARD_BRIDGE_PID" 2>/dev/null; then
+    wait "$CLIPBOARD_BRIDGE_PID" 2>/dev/null || true
+    printf 'Failed to start clipboard bridge.\n' >&2
+    exit 1
+  fi
 }
 
 termux_font_defaults() {
@@ -337,6 +377,10 @@ else
 fi
 
 cleanup() {
+  if [ -n "${CLIPBOARD_BRIDGE_PID:-}" ]; then
+    kill "$CLIPBOARD_BRIDGE_PID" 2>/dev/null || true
+    wait "$CLIPBOARD_BRIDGE_PID" 2>/dev/null || true
+  fi
   if [ -n "${TTYD_PID:-}" ]; then kill "$TTYD_PID" 2>/dev/null || true; fi
   if [ -n "${PUBLIC_DIR:-}" ] && [ -d "$PUBLIC_DIR" ]; then rm -rf "$PUBLIC_DIR"; fi
 }
@@ -371,6 +415,8 @@ with open(path, "w", encoding="utf-8") as file:
     file.write(";\n")
 PY
 
+start_clipboard_bridge
+
 ttyd \
   --writable \
   --interface "$HOST" \
@@ -387,6 +433,7 @@ TTYD_PID="$!"
 
 printf 'ttyd: http://%s:%s/\n' "$HOST" "$TTYD_PORT"
 printf 'PWA:  http://%s:%s/\n' "$HOST" "$APP_PORT"
+printf 'Clipboard bridge: http://%s:%s/\n' "$CLIPBOARD_BRIDGE_HOST" "$CLIPBOARD_BRIDGE_PORT"
 printf 'Termux font copy: %s\n' "$COPY_TERMUX_FONT"
 printf 'Font: style=%s family=%s size=%s weight=%s letter-spacing=%s line-height=%s\n' "$FONT_STYLE" "$FONT_FAMILY" "$FONT_SIZE" "$FONT_WEIGHT" "$LETTER_SPACING" "$LINE_HEIGHT"
 printf 'Terminal padding: %s\n' "$TERMINAL_PADDING"

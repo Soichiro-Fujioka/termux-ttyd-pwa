@@ -18,10 +18,12 @@ rm -rf "$BUILD_DIR"
 mkdir -p \
   "$BUILD_DIR/DEBIAN" \
   "$BUILD_DIR$TERMUX_PREFIX/bin" \
+  "$BUILD_DIR$TERMUX_PREFIX/share/$PACKAGE/extras" \
   "$BUILD_DIR$TERMUX_PREFIX/share/$PACKAGE" \
   "$OUTPUT_DIR"
 
 install -m 755 "$ROOT_DIR/bin/termux-ttyd-pwa" "$BUILD_DIR$TERMUX_PREFIX/bin/termux-ttyd-pwa"
+install -m 755 "$ROOT_DIR/extras/termux-clipboard-bridge.py" "$BUILD_DIR$TERMUX_PREFIX/share/$PACKAGE/extras/termux-clipboard-bridge.py"
 cp -R "$ROOT_DIR/public" "$BUILD_DIR$TERMUX_PREFIX/share/$PACKAGE/public"
 INSTALLED_SIZE="$(du -sk "$BUILD_DIR$TERMUX_PREFIX" | cut -f1)"
 
