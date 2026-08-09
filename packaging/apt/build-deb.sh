@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PACKAGE="termux-ttyd-pwa"
-VERSION="${VERSION:-0.1.0}"
+VERSION="${VERSION:-0.1.2}"
 ARCHITECTURE="all"
 TERMUX_PREFIX="${TERMUX_PREFIX:-/data/data/com.termux/files/usr}"
 BUILD_DIR="$ROOT_DIR/build/deb/$PACKAGE"
@@ -21,6 +21,7 @@ mkdir -p \
   "$BUILD_DIR$TERMUX_PREFIX/share/$PACKAGE/extras" \
   "$BUILD_DIR$TERMUX_PREFIX/share/$PACKAGE" \
   "$OUTPUT_DIR"
+rm -f "$OUTPUT_DIR/${PACKAGE}_"*.deb
 
 install -m 755 "$ROOT_DIR/bin/termux-ttyd-pwa" "$BUILD_DIR$TERMUX_PREFIX/bin/termux-ttyd-pwa"
 install -m 755 "$ROOT_DIR/extras/termux-clipboard-bridge.py" "$BUILD_DIR$TERMUX_PREFIX/share/$PACKAGE/extras/termux-clipboard-bridge.py"

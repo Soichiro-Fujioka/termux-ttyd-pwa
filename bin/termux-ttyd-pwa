@@ -29,10 +29,12 @@ CLIPBOARD_BRIDGE_HOST="${TERMUX_CLIPBOARD_BRIDGE_HOST:-127.0.0.1}"
 CLIPBOARD_BRIDGE_PORT="${TERMUX_CLIPBOARD_BRIDGE_PORT:-8765}"
 CLIPBOARD_BRIDGE="${TERMUX_TTYD_PWA_CLIPBOARD_BRIDGE:-yes}"
 TMUX_SESSION=""
+NATIVE_TMUX_SOCKET="termux-ttyd-pwa"
+NATIVE_TMUX_STATUS="${TERMUX_TTYD_PWA_NATIVE_TMUX_STATUS:-no}"
 COMMAND=("${SHELL:-bash}")
 
 usage() {
-  printf 'Usage: %s [--host HOST] [--app-port PORT] [--ttyd-port PORT] [--clipboard-bridge yes|no] [--no-clipboard-bridge] [--tmux-session NAME] [--font-style termux] [--copy-termux-font yes|no] [--android-font-family FAMILY] [--font-size SIZE] [--font-weight WEIGHT] [--letter-spacing SPACING] [--line-height HEIGHT] [--terminal-padding CSS_LENGTH] [-- COMMAND...]\n' "$0"
+  printf 'Usage: %s [--host HOST] [--app-port PORT] [--ttyd-port PORT] [--clipboard-bridge yes|no] [--no-clipboard-bridge] [--tmux-session NAME] [--native-tmux-status yes|no] [--font-style termux] [--copy-termux-font yes|no] [--android-font-family FAMILY] [--font-size SIZE] [--font-weight WEIGHT] [--letter-spacing SPACING] [--line-height HEIGHT] [--terminal-padding CSS_LENGTH] [-- COMMAND...]\n' "$0"
 }
 
 font_family_for_style() {
@@ -329,6 +331,26 @@ start_clipboard_bridge() {
   fi
 }
 
+write_native_tmux_config() {
+  local config_path="$1"
+  local native_tmux_status="$2"
+  local tmux_status="off"
+
+  if [ "$native_tmux_status" = "yes" ]; then
+    tmux_status="on"
+  fi
+
+  {
+    printf 'set -g status %s\n' "$tmux_status"
+    if [ "$native_tmux_status" = "no" ]; then
+      printf 'set -g status-left ""\n'
+      printf 'set -g status-right ""\n'
+    fi
+    printf 'set -g prefix None\n'
+    printf 'set -g mouse off\n'
+  } > "$config_path"
+}
+
 termux_font_defaults() {
   python3 - "$FONT_SIZE" "$FONT_WEIGHT" "$LETTER_SPACING" "$LINE_HEIGHT" "${TERMUX_PROPERTIES_FILE:-}" "${HOME:-}/.termux/termux.properties" "/data/data/com.termux/files/home/.termux/termux.properties" <<'PY'
 import os
@@ -370,6 +392,7 @@ PY
 
 eval "$(termux_font_defaults)"
 CLIPBOARD_BRIDGE="$(normalize_yes_no TERMUX_TTYD_PWA_CLIPBOARD_BRIDGE "$CLIPBOARD_BRIDGE")"
+NATIVE_TMUX_STATUS="$(normalize_yes_no TERMUX_TTYD_PWA_NATIVE_TMUX_STATUS "$NATIVE_TMUX_STATUS")"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -400,6 +423,11 @@ while [ "$#" -gt 0 ]; do
     --tmux-session)
       require_value "$@"
       TMUX_SESSION="$2"
+      shift 2
+      ;;
+    --native-tmux-status)
+      require_value "$@"
+      NATIVE_TMUX_STATUS="$(normalize_yes_no "$1" "$2")"
       shift 2
       ;;
     --font-style)
@@ -552,8 +580,35 @@ if [ "$CLIPBOARD_BRIDGE" = "yes" ]; then
 fi
 
 if [ -n "$TMUX_SESSION" ]; then
-  printf -v TMUX_COMMAND '%q ' "${COMMAND[@]}"
-  COMMAND=(tmux new-session -A -s "$TMUX_SESSION" "$TMUX_COMMAND")
+  TMUX_WRAPPED_COMMAND=(env -u TMUX "${COMMAND[@]}")
+  printf -v TMUX_COMMAND '%q ' "${TMUX_WRAPPED_COMMAND[@]}"
+  NATIVE_TMUX_CONFIG="$PUBLIC_DIR/native-tmux.conf"
+  write_native_tmux_config "$NATIVE_TMUX_CONFIG" "$NATIVE_TMUX_STATUS"
+  COMMAND=(
+    sh -c '
+      native_tmux_status="off"
+      if [ "$5" = "yes" ]; then native_tmux_status="on"; fi
+      tmux -L "$1" -f "$2" has-session -t "$3" 2>/dev/null || tmux -L "$1" -f "$2" new-session -d -s "$3" "$4"
+      tmux -L "$1" -f "$2" source-file "$2"
+      tmux -L "$1" -f "$2" set-option -g status "$native_tmux_status"
+      tmux -L "$1" -f "$2" set-option -g prefix None
+      tmux -L "$1" -f "$2" set-option -g mouse off
+      if [ "$5" = "no" ]; then
+        tmux -L "$1" -f "$2" set-option -g status-left ""
+        tmux -L "$1" -f "$2" set-option -g status-right ""
+      fi
+      tmux -L "$1" -f "$2" list-sessions -F "#{session_name}" 2>/dev/null | while IFS= read -r tmux_session; do
+        tmux -L "$1" -f "$2" set-option -t "$tmux_session" prefix None
+        tmux -L "$1" -f "$2" set-option -t "$tmux_session" mouse off
+        tmux -L "$1" -f "$2" set-option -t "$tmux_session" status "$native_tmux_status"
+        if [ "$5" = "no" ]; then
+          tmux -L "$1" -f "$2" set-option -t "$tmux_session" status-left ""
+          tmux -L "$1" -f "$2" set-option -t "$tmux_session" status-right ""
+        fi
+      done
+      exec tmux -L "$1" -f "$2" attach-session -t "$3"
+    ' sh "$NATIVE_TMUX_SOCKET" "$NATIVE_TMUX_CONFIG" "$TMUX_SESSION" "$TMUX_COMMAND" "$NATIVE_TMUX_STATUS"
+  )
 fi
 
 ttyd \
@@ -580,5 +635,8 @@ fi
 printf 'Termux font copy: %s\n' "$COPY_TERMUX_FONT"
 printf 'Font: style=%s family=%s size=%s weight=%s letter-spacing=%s line-height=%s\n' "$FONT_STYLE" "$FONT_FAMILY" "$FONT_SIZE" "$FONT_WEIGHT" "$LETTER_SPACING" "$LINE_HEIGHT"
 printf 'Terminal padding: %s\n' "$TERMINAL_PADDING"
+if [ -n "$TMUX_SESSION" ]; then
+  printf 'Native tmux status: %s\n' "$NATIVE_TMUX_STATUS"
+fi
 
 python3 -m http.server "$APP_PORT" --bind "$HOST" --directory "$PUBLIC_DIR"
