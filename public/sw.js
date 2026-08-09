@@ -1,4 +1,4 @@
-var cacheName = "termux-ttyd-pwa-v7";
+var cacheName = "termux-ttyd-pwa-v6";
 
 self.addEventListener("install", function (event) {
   self.skipWaiting();
