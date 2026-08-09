@@ -10,6 +10,7 @@
   --border: rgba(255, 255, 255, 0.12);
   --terminal-padding: 0;
   --terminal-bg: #000;
+  --app-height: 100dvh;
 }
 
 * {
@@ -57,7 +58,7 @@ body {
 }
 
 .terminal-shell {
-  height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  height: calc(var(--app-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   padding-bottom: var(--terminal-padding);
   background: var(--terminal-bg);
 }

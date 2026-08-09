@@ -106,6 +106,41 @@
     }
   }
 
+  function getViewportHeight() {
+    if (window.visualViewport && window.visualViewport.height) {
+      return window.visualViewport.height;
+    }
+    return window.innerHeight;
+  }
+
+  function notifyTerminalResize() {
+    var frameRect = frame.getBoundingClientRect();
+    var message = {
+      type: "termux-ttyd-pwa:fit",
+      height: frameRect.height,
+      width: frameRect.width
+    };
+
+    try {
+      frame.contentWindow.postMessage(message, "*");
+    } catch (error) {}
+
+    try {
+      frame.contentWindow.dispatchEvent(new Event("resize"));
+    } catch (error) {}
+  }
+
+  function refreshViewportSize() {
+    document.documentElement.style.setProperty("--app-height", getViewportHeight() + "px");
+    notifyTerminalResize();
+  }
+
+  function scheduleViewportRefresh() {
+    [0, 50, 150, 350, 700].forEach(function (delay) {
+      window.setTimeout(refreshViewportSize, delay);
+    });
+  }
+
   function isFullscreen() {
     return Boolean(document.fullscreenElement) || window.matchMedia("(display-mode: fullscreen)").matches;
   }
@@ -115,11 +150,13 @@
     fullscreenToggle.classList.toggle("is-active", active);
     fullscreenToggle.setAttribute("aria-pressed", active ? "true" : "false");
     fullscreenToggle.textContent = active ? "Fullscreen: On" : "Fullscreen";
+    scheduleViewportRefresh();
   }
 
   var settings = readSettings();
   applyForm(settings);
   loadTerminal(settings);
+  refreshViewportSize();
   updateFullscreenState();
 
   if ("serviceWorker" in navigator) {
@@ -128,8 +165,12 @@
     });
   }
 
+  window.addEventListener("load", scheduleViewportRefresh);
+  window.addEventListener("pageshow", scheduleViewportRefresh);
+
   frame.addEventListener("load", function () {
     focusFrame();
+    scheduleViewportRefresh();
   });
 
   settingsToggle.addEventListener("click", function () {
@@ -156,6 +197,10 @@
   try {
     window.matchMedia("(display-mode: fullscreen)").addEventListener("change", updateFullscreenState);
   } catch (error) {}
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", scheduleViewportRefresh);
+  }
 
   drawerBackdrop.addEventListener("click", closeDrawer);
 
@@ -221,8 +266,8 @@
   });
 
   window.addEventListener("resize", function () {
-    try {
-      frame.contentWindow.dispatchEvent(new Event("resize"));
-    } catch (error) {}
+    scheduleViewportRefresh();
   });
+
+  window.addEventListener("orientationchange", scheduleViewportRefresh);
 })();
