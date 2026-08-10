@@ -8,6 +8,7 @@ A lightweight PWA wrapper for `ttyd` on Android Termux. It keeps the terminal as
 - `ttyd`
 - `python3`
 - `tmux` when using `--tmux-session`
+- Recommended on native Termux: `tmux` and `termux-api`
 
 ## APT Repository Install
 
