@@ -3,11 +3,20 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PACKAGE="termux-ttyd-pwa"
-VERSION="${VERSION:-0.1.2}"
+VERSION="${VERSION:-}"
 ARCHITECTURE="all"
 TERMUX_PREFIX="${TERMUX_PREFIX:-/data/data/com.termux/files/usr}"
 BUILD_DIR="$ROOT_DIR/build/deb/$PACKAGE"
 OUTPUT_DIR="$ROOT_DIR/dist/deb"
+
+if [ -z "$VERSION" ]; then
+  VERSION="$(git -C "$ROOT_DIR" describe --tags --exact-match 2>/dev/null | sed 's/^v//' || true)"
+fi
+
+if [ -z "$VERSION" ]; then
+  printf 'VERSION is required. Set VERSION=0.1.0 or build from a vX.Y.Z tag.\n' >&2
+  exit 1
+fi
 
 if ! command -v dpkg-deb >/dev/null 2>&1; then
   printf 'dpkg-deb is required. Install it with: pkg install dpkg\n' >&2

@@ -70,6 +70,7 @@ for arch in "${ARCHES[@]}"; do
 done
 
 RELEASE_FILE="$REPO_DIR/dists/$SUITE/Release"
+RELEASE_DATE="$(LC_ALL=C TZ=UTC date '+%a, %d %b %Y %H:%M:%S +0000')"
 cat > "$RELEASE_FILE" <<EOF
 Origin: termux-ttyd-pwa
 Label: termux-ttyd-pwa
@@ -78,6 +79,7 @@ Codename: $SUITE
 Architectures: ${ARCHES[*]}
 Components: $COMPONENT
 Description: APT repository for termux-ttyd-pwa
+Date: $RELEASE_DATE
 EOF
 
 append_hashes() {

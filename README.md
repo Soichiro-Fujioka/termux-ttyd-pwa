@@ -38,6 +38,15 @@ termux-ttyd-pwa
 
 The `Publish APT repository` GitHub Actions workflow builds the `.deb`, signs the APT repository metadata, and deploys `dist/apt-repo` to GitHub Pages.
 
+Official releases are published from `vX.Y.Z` tags. The Debian package version is derived from the tag by removing the leading `v`, so tag `v0.1.0` produces package version `0.1.0`.
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+For manual workflow runs, provide the version without the leading `v`.
+
 Configure GitHub Pages to use GitHub Actions as the source, then add this repository secret:
 
 - `APT_GPG_PRIVATE_KEY`: armored private key for the APT signing key
