@@ -110,7 +110,7 @@ Useful options:
 - `--clipboard-bridge yes`
 - `--no-clipboard-bridge`
 - `--tmux-session NAME`
-- `--native-tmux-conf ~/.tmux-pwa.conf`
+- `--native-tmux-status no`
 - `--font-style termux`
 - `--copy-termux-font yes`
 - `--android-font-family monospace`
@@ -125,7 +125,7 @@ The default font behavior is `--copy-termux-font yes`. It uses the font file con
 
 The clipboard bridge starts by default. If you only use native Termux clipboard commands directly and do not need the proot-oriented bridge, disable it with `--clipboard-bridge no` or `--no-clipboard-bridge`.
 
-When `--tmux-session NAME` is used, the native Termux tmux layer reads `~/.tmux-pwa.conf` by default. If that file does not exist, `termux-ttyd-pwa` creates it with PWA-friendly defaults that hide the native status bar, disable the native prefix key, and turn mouse handling off. Use `--native-tmux-conf PATH` to read a different native tmux config file.
+When `--tmux-session NAME` is used, the native Termux tmux layer reads `~/.tmux-pwa.conf` by default. If that file does not exist, `termux-ttyd-pwa` creates it with PWA-friendly defaults that hide the native status bar, disable the native prefix key, and turn mouse handling off. Use `--native-tmux-status yes` to show the native Termux tmux status bar.
 
 To use an Android browser/system font instead, disable the Termux font copy and specify the CSS font family explicitly:
 
@@ -253,7 +253,7 @@ If the PWA is started from native Termux but your main shell is `proot` plus `tm
 termux-ttyd-pwa --tmux-session main -- proot-distro login ubuntu -- tmux new -A -s main
 ```
 
-`ttyd` starts its command for each browser terminal connection. `--tmux-session main` makes reconnects attach to a dedicated native Termux tmux server instead, so the `proot` process is only created when that native tmux session does not already exist. The native tmux layer uses `~/.tmux-pwa.conf` by default, leaving your normal `~/.tmux.conf` unchanged. Edit `~/.tmux-pwa.conf` or pass `--native-tmux-conf PATH` if you want to show the native status bar or customize the outer tmux layer.
+`ttyd` starts its command for each browser terminal connection. `--tmux-session main` makes reconnects attach to a dedicated native Termux tmux server instead, so the `proot` process is only created when that native tmux session does not already exist. The native tmux layer uses `~/.tmux-pwa.conf` by default, leaving your normal `~/.tmux.conf` unchanged. Pass `--native-tmux-status yes` if you want to show the native Termux tmux status bar.
 
 If Ubuntu already starts tmux automatically during login and you do not need PWA reconnects to preserve the `proot` process, you can skip `--tmux-session`:
 
