@@ -2,6 +2,8 @@
 
 A lightweight PWA wrapper for `ttyd` on Android Termux. It keeps the terminal as the main surface while adding swipe-open controls for settings and fullscreen.
 
+![Screenshot](assets/screenshot-samsung-browser.jpg)
+
 ## Requirements
 
 - Android + Termux
